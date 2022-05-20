@@ -3,8 +3,8 @@ use std::io::BufRead;
 use rust_htslib::bgzf;
 use std::collections::{HashSet, HashMap};
 use counter::Counter;
-use crate::cb_umi_errors::{parse_r1, get_1bp_mutations, parse_whitelist_gz};
-use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
+use crate::utils::{parse_r1, set_comparison, write_to_csv};
+use polars::prelude::{DataFrame, NamedFrom, Series};
 use std::fs::File;
 use streaming_algorithms::{CountMinSketch, Top};
 
@@ -144,13 +144,7 @@ pub fn run_top(fastq_list: Vec<String>){
     println!("{:?}", df_final);
 
     // write to CSV
-    let mut output_file: File = File::create("/tmp/topN.csv".to_string()).unwrap();
-    CsvWriter::new(&mut output_file)
-        .has_header(true)
-        .finish(&mut df_final)
-        .unwrap();  
-
-
+    write_to_csv(&mut df_final, "/tmp/topN.csv".to_string());    
 }
 
 
@@ -246,28 +240,6 @@ pub fn run_gt1(fastq_list: Vec<String>){
 
 }
 
-use core::hash::Hash;
-fn set_comparison<T>(set_a: &HashSet<T>,set_b: &HashSet<T>)
-    where T: Eq + Hash
-{
-    // warning: this instantiates all the sets
-    // instead, just iterate over them
-    let intersect = set_a.intersection(set_b).collect::<Vec<&T>>();
-    let AminusB = set_a.difference(set_b).collect::<Vec<&T>>();
-    let BminusA = set_b.difference(set_a).collect::<Vec<&T>>();
-    println!("|A&B| {} |A-B| {}  |B-A|{}", intersect.len(), AminusB.len(), BminusA.len());
-
-    // let n_intersect = set_a.intersection(set_b).fold(0, |accum, _item| accum+1);
-    // let n_AminusB = set_a.difference(set_b).fold(0, |accum, _item| accum+1);
-    // let n_BminusA = set_b.difference(set_a).fold(0, |accum, _item| accum+1);
-
-    let n_intersect = set_a.intersection(set_b).count();
-    let n_AminusB = set_a.difference(set_b).count();
-    let n_BminusA = set_b.difference(set_a).count();
-
-    println!("|A&B| {} |A-B| {}  |B-A|{}", n_intersect, n_AminusB, n_BminusA);
-
-}
 
 pub fn run(fastq_list: Vec<String>){
 
@@ -344,10 +316,5 @@ pub fn run(fastq_list: Vec<String>){
     println!("{:?}", df_final);
 
     // write to CSV
-    let mut output_file: File = File::create("/tmp/CMS.csv".to_string()).unwrap();
-    CsvWriter::new(&mut output_file)
-        .has_header(true)
-        .finish(&mut df_final)
-        .unwrap();        
-    
+    write_to_csv(&mut df_final, "/tmp/CMS.csv".to_string());        
 }

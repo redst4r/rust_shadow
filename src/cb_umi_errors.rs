@@ -4,46 +4,13 @@ use std::io::BufRead;
 // use flate2::read::GzDecoder;
 use rust_htslib::bgzf;
 use std::collections::{HashMap, HashSet};
-// use rusqlite::{Connection, Result};
-// use rusqlite::NO_PARAMS;
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
 use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
 use std::fs::File;
+use crate::utils::{parse_whitelist_gz,parse_r1, get_1bp_mutations, write_to_csv};
 
 
-struct CbUmi{
-    cb: String,
-    umi: String,
-}
-
-
-pub fn parse_whitelist_gz(fname: String) -> HashSet<String>{
-    // loading 10x CB whilelist from file
-    let decoder = bgzf::Reader::from_path(fname).unwrap();
-    let reader = BufReader::new(decoder);
-    let my_iter = reader.lines();//.take(10_000_000);
-    let mut hset: HashSet<String> = HashSet::new();
-    for l in my_iter{
-        if let Ok(line) = l{
-            hset.insert(line);
-        }
-    }
-    hset
-}
-
-pub fn parse_r1(seq: String) -> Option<(String, String)>{
-    // TODO: size check
-    // if seq.len() == 16 + 12{
-        let cb = (&seq[0..16]).into();
-        let umi = (&seq[16..28]).into();
-        Some((cb, umi))
-    // }
-    // else
-    // {
-        // None
-    // }
-}
 
 pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<(String, String), i32> {
     // coutns the CB/UMI pairs in the fastq
@@ -149,20 +116,7 @@ pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, St
 }
 
 
-pub fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
-    // return the three 1BP mutations of a sequence at the given position"
-    let mut muts = Vec::with_capacity(3);
 
-    for base in ['A', 'C', 'G', 'T']{
-        let prefix = &seq[0..pos];
-        let postfix = &seq[(pos+1)..];
-        let m = format!("{prefix}{base}{postfix}");
-        if m != *seq{
-            muts.push(m);
-        }
-    }
-    return muts
-}
 
 pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: String){
 
@@ -235,9 +189,5 @@ pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: Str
     println!("{:?}", df_final);
 
     // write to CSV
-    let mut output_file: File = File::create(output_csv_file).unwrap();
-    CsvWriter::new(&mut output_file)
-        .has_header(true)
-        .finish(&mut df_final)
-        .unwrap();        
+    write_to_csv(&mut df_final, output_csv_file);    
 }

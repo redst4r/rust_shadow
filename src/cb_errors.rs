@@ -4,7 +4,7 @@ use rust_htslib::bgzf;
 use std::collections::{HashMap};
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
-use crate::cb_umi_errors::{parse_r1, get_1bp_mutations, parse_whitelist_gz};
+use crate::utils::{parse_r1, get_1bp_mutations, parse_whitelist_gz, write_to_csv};
 use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
 use std::fs::File;
 
@@ -192,13 +192,8 @@ pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: Str
     println!("{:?}", df_final);
 
     // write to CSV
-    let mut output_file: File = File::create(output_csv_file).unwrap();
-    CsvWriter::new(&mut output_file)
-        .has_header(true)
-        .finish(&mut df_final)
-        .unwrap();        
-
-
+    write_to_csv(&mut df_final, output_csv_file);    
+    
     // // countmap into csv
     // let mut cb: Vec<String> = Vec::new();
     // let mut freq: Vec<i32> = Vec::new();
