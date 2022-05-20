@@ -1,7 +1,7 @@
 use std::io::BufReader;
 use std::io::BufRead;
 use rust_htslib::bgzf;
-use std::collections::{HashSet};
+use std::collections::{HashSet, HashMap};
 use counter::Counter;
 use crate::cb_umi_errors::{parse_r1, get_1bp_mutations, parse_whitelist_gz};
 use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
@@ -60,6 +60,9 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
 }
 
 pub fn run_top(fastq_list: Vec<String>){
+
+    // determinig the topN barcodes in the fastqs
+
     let file_iterators = fastq_list.into_iter()
         .map(|fname|{
             let decoder = bgzf::Reader::from_path(fname).unwrap();
@@ -74,7 +77,7 @@ pub fn run_top(fastq_list: Vec<String>){
     // chaining, flatmapping all the iterators into a single one
     let my_iter = file_iterators.flat_map(|x| x);
 
-    let TOPN = 1000; 
+    let TOPN = 10000; 
     let tolerance = 1e-8;
     let probability = 0.00001;
 
@@ -85,11 +88,14 @@ pub fn run_top(fastq_list: Vec<String>){
     for (i, l) in my_iter.enumerate(){
         if let Ok(line) = l{
             if let Some((cb, _umi)) = parse_r1(line){
-                let cb2 = cb.clone();
-                let counter = countermap.entry(cb).or_insert(0);
+                let cb_umi = format!("{cb}_{_umi}");
+                let cb_umi2 = format!("{cb}_{_umi}");
+
+                // let cb2 = cb.clone();
+                let counter = countermap.entry(cb_umi).or_insert(0);
                 *counter += 1;
 
-                ccc.push(cb2, &1);
+                ccc.push(cb_umi2, &1);
             }
         }
         if i % 1_000_000 == 0{
@@ -101,28 +107,50 @@ pub fn run_top(fastq_list: Vec<String>){
         .map(|(seq, _freq)| (*seq).clone())
         .collect();
 
-
-
     // compare true to estimated topN
     let true_top: HashSet<String> = countermap.most_common().iter().take(TOPN).map(|(seq, _freq)| (*seq).clone()).collect();
 
-    let n_intersect: Vec<&String> = true_top.intersection(&approx_top).collect();
-    let n_intersect = n_intersect.len();
+    set_comparison(&true_top, &approx_top);
 
-    let n_diff1: Vec<&String> = true_top.difference(&approx_top).collect();
-    let n_diff1 = n_diff1.len();
-
-    let n_diff2: Vec<&String> = approx_top.difference(&true_top).collect();
-    let n_diff2 = n_diff2.len();
-
-    println!("D1 {n_diff1} Inter {n_intersect} D2 {n_diff2}");
-
-
-    let aaa: Vec<(String, u32)> = countermap.most_common().into_iter().take(TOPN).collect();
-    println!("True top N {:?}", aaa);
+    // let aaa: Vec<(String, u32)> = countermap.most_common().into_iter().take(TOPN).collect();
+    // println!("True top N {:?}", aaa);
 
     // println!("True top N {:?}", true_top);
     // println!("appr top N {:?}", approx_top);
+
+    //write to file
+    // first merge the cbs
+    let mut true_top_dict: HashMap<String, u32> = HashMap::new();
+    
+    for (k,v) in ccc.iter(){
+        true_top_dict.insert(k.clone() ,*v);
+    }
+
+
+    let mut true_freqs: Vec<u32> = Vec::new();
+    let mut approx_freqs: Vec<u32> = Vec::new();
+
+    for item in true_top.union(&approx_top).into_iter(){
+        let f1 = countermap.get(item).cloned().unwrap_or(0);
+        let f2 = true_top_dict.get(item).cloned().unwrap_or(0);
+        true_freqs.push(f1);
+        approx_freqs.push(f2)
+    }
+
+    let df_true = Series::new("true_frequency", true_freqs);
+    let df_approx = Series::new("approx_frequency", approx_freqs);
+    
+    let mut df_final = DataFrame::new(vec![df_true, df_approx]).unwrap();
+    println!("{:?}", df_final);
+
+    // write to CSV
+    let mut output_file: File = File::create("/tmp/topN.csv".to_string()).unwrap();
+    CsvWriter::new(&mut output_file)
+        .has_header(true)
+        .finish(&mut df_final)
+        .unwrap();  
+
+
 }
 
 
@@ -148,6 +176,8 @@ impl GreaterThan1Bloom {
 }
 
 pub fn run_gt1(fastq_list: Vec<String>){
+
+    // get all CB_UMI that occur more than once
 
     let file_iterators = fastq_list.into_iter()
         .map(|fname|{
@@ -207,8 +237,35 @@ pub fn run_gt1(fastq_list: Vec<String>){
     println!("True #>1 {}  Estimated #>1 {}",fsize, GE.greater_than_1_items.len());
 
 
+    let x: HashSet<String> = f.into_iter().collect();
+    let y: HashSet<String> = GE.greater_than_1_items.into_iter().collect();
+    set_comparison(&x, &y)
+
     // println!("True #>1 {:?} ", f);
     // println!("Est #>1 {:?} ", GE.greater_than_1_items);
+
+}
+
+use core::hash::Hash;
+fn set_comparison<T>(set_a: &HashSet<T>,set_b: &HashSet<T>)
+    where T: Eq + Hash
+{
+    // warning: this instantiates all the sets
+    // instead, just iterate over them
+    let intersect = set_a.intersection(set_b).collect::<Vec<&T>>();
+    let AminusB = set_a.difference(set_b).collect::<Vec<&T>>();
+    let BminusA = set_b.difference(set_a).collect::<Vec<&T>>();
+    println!("|A&B| {} |A-B| {}  |B-A|{}", intersect.len(), AminusB.len(), BminusA.len());
+
+    // let n_intersect = set_a.intersection(set_b).fold(0, |accum, _item| accum+1);
+    // let n_AminusB = set_a.difference(set_b).fold(0, |accum, _item| accum+1);
+    // let n_BminusA = set_b.difference(set_a).fold(0, |accum, _item| accum+1);
+
+    let n_intersect = set_a.intersection(set_b).count();
+    let n_AminusB = set_a.difference(set_b).count();
+    let n_BminusA = set_b.difference(set_a).count();
+
+    println!("|A&B| {} |A-B| {}  |B-A|{}", n_intersect, n_AminusB, n_BminusA);
 
 }
 
