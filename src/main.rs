@@ -3,6 +3,7 @@
 // mod hset;
 mod cb_umi_errors;
 mod cb_errors;
+mod sketching;
 // use fastq::{parse_path, Record, Parser};
 // use std::env::args;
 
@@ -11,6 +12,7 @@ fn main() {
     // myfastq::run();
     // sqlite::run();
     // hset::run();
+
 
     // let fastq_file: String = "/home/michi/r1.fastq.gz".into();
     // let fastq_file: String = "/home/michi/Virus_barcode_CKDL220009934-1a_HN2MJDSX3_L3_1.fq.gz".into();
@@ -41,11 +43,14 @@ fn main() {
     let fastq_list = vec![fastq_file1, fastq_file2, fastq_file3, fastq_file4, fastq_file5, fastq_file6, fastq_file7, fastq_file8] ;
 
 
+    sketching::run(fastq_list);
+
+    if false{
     // cb_errors::run(fastq_list, whitelist_file, "/tmp/out_cb.csv".to_string())
-    cb_umi_errors::run(fastq_list, whitelist_file, "/tmp/out_cb_umi.csv".to_string());
+    // cb_umi_errors::run(fastq_list, whitelist_file, "/tmp/out_cb_umi.csv".to_string());
 
 
     // cb_errors::run(fastq_file, whitelist_file, "/tmp/out_cb.csv".to_string())
 
-
+    }
 }
