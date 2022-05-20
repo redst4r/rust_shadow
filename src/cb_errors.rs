@@ -8,17 +8,27 @@ use crate::cb_umi_errors::{parse_r1, get_1bp_mutations, parse_whitelist_gz};
 use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
 use std::fs::File;
 
-pub fn count_cb(fname: String) -> Counter<String, i32> {
-    // coutns the CB/UMI pairs in the fastq
+
+pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
+    // coutns the CB/UMI pairs in the fastqs
+
 
     // reading the fastq.gz
-    let decoder = bgzf::Reader::from_path(fname).unwrap();
-    let reader = BufReader::new(decoder);
-    let my_iter = reader.lines()
-        .enumerate().filter(|x| x.0 % 4 == 1)
-        .map(|x| x.1)
-        ;//.take(1_000_000);
+    // we chain all those files together into a single iterator
+    let file_iterators = fname_list.into_iter()
+        .map(|fname|{
+            let decoder = bgzf::Reader::from_path(fname).unwrap();
+            let reader = BufReader::new(decoder);
+            let my_iter = reader.lines()
+                .enumerate().filter(|x| x.0 % 4 == 1)
+                .map(|x| x.1)
+                .take(10_000_000);
+            my_iter
+        }
+        );
 
+    // chaining, flatmapping all the iterators into a single one
+    let my_iter = file_iterators.flat_map(|x| x);
 
     // parsing the lines, counting
     let mut countermap: Counter<String, i32> = Counter::new();
@@ -36,6 +46,37 @@ pub fn count_cb(fname: String) -> Counter<String, i32> {
     }
     countermap
 }
+
+
+
+// pub fn count_cb(fname: String) -> Counter<String, i32> {
+//     // coutns the CB/UMI pairs in the fastq
+
+//     // reading the fastq.gz
+//     let decoder = bgzf::Reader::from_path(fname).unwrap();
+//     let reader = BufReader::new(decoder);
+//     let my_iter = reader.lines()
+//         .enumerate().filter(|x| x.0 % 4 == 1)
+//         .map(|x| x.1)
+//         ;//.take(1_000_000);
+
+
+//     // parsing the lines, counting
+//     let mut countermap: Counter<String, i32> = Counter::new();
+
+//     for (i, l) in my_iter.enumerate(){
+//         if let Ok(line) = l{
+//             if let Some((cb, _umi)) = parse_r1(line){
+//                 let counter = countermap.entry(cb).or_insert(0);
+//                 *counter += 1
+//             }
+//         }
+//         if i % 1_000_000 == 0{
+//             println!("Iteration {} Mio", i/1_000_000)
+//         }
+//     }
+//     countermap
+// }
 
 
 pub fn top_n(counter: &Counter<String, i32>, n: i32) -> Vec<String>{
@@ -98,14 +139,14 @@ pub fn find_shadows(cb: String, filtered_map: &Counter<String, i32>) -> HashMap<
 }
 
 
-pub fn run(fastq_file: String, whitelist_file: String, output_csv_file: String){
+pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: String){
 
     // parse whitelist
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
     
-    let countmap = count_cb(fastq_file);
+    let countmap = count_cb_filelist(fastq_list);
     println!("len of counter {}", countmap.len());
 
 
