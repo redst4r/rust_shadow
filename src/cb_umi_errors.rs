@@ -12,6 +12,12 @@ use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
 use std::fs::File;
 
 
+struct CbUmi{
+    cb: String,
+    umi: String,
+}
+
+
 pub fn parse_whitelist_gz(fname: String) -> HashSet<String>{
     // loading 10x CB whilelist from file
     let decoder = bgzf::Reader::from_path(fname).unwrap();
@@ -39,16 +45,24 @@ pub fn parse_r1(seq: String) -> Option<(String, String)>{
     // }
 }
 
-pub fn count_cb_umi(fname: String) -> Counter<(String, String), i32> {
+pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<(String, String), i32> {
     // coutns the CB/UMI pairs in the fastq
 
     // reading the fastq.gz
-    let decoder = bgzf::Reader::from_path(fname).unwrap();
-    let reader = BufReader::new(decoder);
-    let my_iter = reader.lines()
-        .enumerate().filter(|x| x.0 % 4 == 1)
-        .map(|x| x.1)
-        ;//.take(10_000_000);
+    // we chain all those files together into a single iterator
+    let file_iterators = fname_list.into_iter()
+        .map(|fname|{
+            let decoder = bgzf::Reader::from_path(fname).unwrap();
+            let reader = BufReader::new(decoder);
+            let my_iter = reader.lines()
+                .enumerate().filter(|x| x.0 % 4 == 1)
+                .map(|x| x.1);
+            my_iter
+        }
+        );
+
+    // chaining, flatmapping all the iterators into a single one
+    let my_iter = file_iterators.flat_map(|x| x);
 
 
     // parsing the lines, counting
@@ -150,14 +164,14 @@ pub fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
     return muts
 }
 
-pub fn run(fastq_file: String, whitelist_file: String, output_csv_file: String){
+pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: String){
 
     // parse whitelist
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
     
-    let mut countmap = count_cb_umi(fastq_file);
+    let mut countmap = count_cb_filelist(fastq_list);
     // transform into shadow counter
     println!("len of counter {}", countmap.len());
 

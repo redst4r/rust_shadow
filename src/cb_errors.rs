@@ -21,8 +21,7 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
             let reader = BufReader::new(decoder);
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1)
-                .take(10_000_000);
+                .map(|x| x.1);
             my_iter
         }
         );
