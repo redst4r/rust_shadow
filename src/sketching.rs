@@ -1,13 +1,12 @@
 use std::io::BufReader;
 use std::io::BufRead;
 use rust_htslib::bgzf;
-use std::collections::{HashMap};
+use std::collections::{HashSet};
 use counter::Counter;
-use bktree::{BkTree, levenshtein_distance};
 use crate::cb_umi_errors::{parse_r1, get_1bp_mutations, parse_whitelist_gz};
 use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
 use std::fs::File;
-use streaming_algorithms::{CountMinSketch};
+use streaming_algorithms::{CountMinSketch, Top};
 
 
 //
@@ -60,6 +59,158 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
     countermap
 }
 
+pub fn run_top(fastq_list: Vec<String>){
+    let file_iterators = fastq_list.into_iter()
+        .map(|fname|{
+            let decoder = bgzf::Reader::from_path(fname).unwrap();
+            let reader = BufReader::new(decoder);
+            let my_iter = reader.lines()
+                .enumerate().filter(|x| x.0 % 4 == 1)
+                .map(|x| x.1);
+            my_iter
+        }
+        );
+
+    // chaining, flatmapping all the iterators into a single one
+    let my_iter = file_iterators.flat_map(|x| x);
+
+    let TOPN = 1000; 
+    let tolerance = 1e-8;
+    let probability = 0.00001;
+
+
+    let mut ccc:Top<String, u32> = Top::new(TOPN, probability, tolerance, {});
+    let mut countermap: Counter<String, u32> = Counter::new();
+
+    for (i, l) in my_iter.enumerate(){
+        if let Ok(line) = l{
+            if let Some((cb, _umi)) = parse_r1(line){
+                let cb2 = cb.clone();
+                let counter = countermap.entry(cb).or_insert(0);
+                *counter += 1;
+
+                ccc.push(cb2, &1);
+            }
+        }
+        if i % 1_000_000 == 0{
+            println!("Iteration {} Mio", i/1_000_000)
+        }        
+    }
+
+    let approx_top: HashSet<String> = ccc.iter()
+        .map(|(seq, _freq)| (*seq).clone())
+        .collect();
+
+
+
+    // compare true to estimated topN
+    let true_top: HashSet<String> = countermap.most_common().iter().take(TOPN).map(|(seq, _freq)| (*seq).clone()).collect();
+
+    let n_intersect: Vec<&String> = true_top.intersection(&approx_top).collect();
+    let n_intersect = n_intersect.len();
+
+    let n_diff1: Vec<&String> = true_top.difference(&approx_top).collect();
+    let n_diff1 = n_diff1.len();
+
+    let n_diff2: Vec<&String> = approx_top.difference(&true_top).collect();
+    let n_diff2 = n_diff2.len();
+
+    println!("D1 {n_diff1} Inter {n_intersect} D2 {n_diff2}");
+
+
+    let aaa: Vec<(String, u32)> = countermap.most_common().into_iter().take(TOPN).collect();
+    println!("True top N {:?}", aaa);
+
+    // println!("True top N {:?}", true_top);
+    // println!("appr top N {:?}", approx_top);
+}
+
+
+struct GreaterThan1Bloom {
+    minsketch : CountMinSketch<String, u32>,  // for storing items seen once
+    greater_than_1_items : HashSet<String>
+}
+impl GreaterThan1Bloom {
+    fn add_item(&mut self, item:&String){
+
+        let current_freq = self.minsketch.get(item);
+        // println!("Adding item {item}, current freq = {current_freq}");
+
+        if  current_freq == 0{
+            self.minsketch.push(item, &1);
+        }
+        else{
+            self.greater_than_1_items.insert(item.clone());
+        }
+
+        // println!("Current #>1 {}", self.greater_than_1_items.len())
+    }
+}
+
+pub fn run_gt1(fastq_list: Vec<String>){
+
+    let file_iterators = fastq_list.into_iter()
+        .map(|fname|{
+            let decoder = bgzf::Reader::from_path(fname).unwrap();
+            let reader = BufReader::new(decoder);
+            let my_iter = reader.lines()
+                .enumerate().filter(|x| x.0 % 4 == 1)
+                .map(|x| x.1);
+            my_iter
+        }
+        );
+
+    // chaining, flatmapping all the iterators into a single one
+    let my_iter = file_iterators.flat_map(|x| x);
+
+    let tolerance = 1e-8;
+    let probability = 0.00001;
+
+
+    let mut ccc:CountMinSketch<String, u32> = CountMinSketch::new(probability, tolerance, {});
+    let mut v: HashSet<String> = HashSet::new();
+
+    let mut GE = GreaterThan1Bloom {
+        minsketch : ccc,
+        greater_than_1_items : v
+    };
+
+    let mut countermap: Counter<String, u32> = Counter::new();
+
+    for (i, l) in my_iter.enumerate(){
+        if let Ok(line) = l{
+            if let Some((cb, _umi)) = parse_r1(line){
+
+                let cb_umi = format!("{cb}_{_umi}");
+                let cb_umi2 = format!("{cb}_{_umi}");
+
+                let counter = countermap.entry(cb_umi).or_insert(0);
+                *counter += 1;
+
+                GE.add_item(&cb_umi2);
+            }
+        }
+        if i % 1_000_000 == 0{
+            println!("Iteration {} Mio", i/1_000_000)
+        }        
+    }
+
+    // true number of >1 elemets
+    println!("Memory savings len(counter) {}", countermap.len());
+
+
+    let f: Vec<String> = countermap.into_iter()
+        .filter(|(k,v)| v>&1).map(|(k, v)| k)
+        .collect();
+    let fsize = f.len();
+
+    println!("True #>1 {}  Estimated #>1 {}",fsize, GE.greater_than_1_items.len());
+
+
+    // println!("True #>1 {:?} ", f);
+    // println!("Est #>1 {:?} ", GE.greater_than_1_items);
+
+}
 
 pub fn run(fastq_list: Vec<String>){
 
