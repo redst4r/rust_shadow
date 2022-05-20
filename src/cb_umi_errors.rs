@@ -8,6 +8,9 @@ use std::collections::{HashMap, HashSet};
 // use rusqlite::NO_PARAMS;
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
+use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
+use std::fs::File;
+
 
 pub fn parse_whitelist_gz(fname: String) -> HashSet<String>{
     // loading 10x CB whilelist from file
@@ -23,7 +26,7 @@ pub fn parse_whitelist_gz(fname: String) -> HashSet<String>{
     hset
 }
 
-fn parse_r1(seq: String) -> Option<(String, String)>{
+pub fn parse_r1(seq: String) -> Option<(String, String)>{
     // TODO: size check
     // if seq.len() == 16 + 12{
         let cb = (&seq[0..16]).into();
@@ -99,7 +102,6 @@ pub fn top_n(counter: &Counter<(String, String), i32>, n: i32) -> Vec<(String, S
     top2
 }
 
-
 pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, String), i32>) -> HashMap<usize, i32>{
     // for a given "true" CB/UMI find the number of shadowed reads (i.e. reads with a single subsitution)
     // and count their number (position specific)
@@ -120,17 +122,20 @@ pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, St
     for (cb, umi, pos) in all_muts{
         if let Some(f) = filtered_map.get(&(cb, umi)){
             // for that shadow cb/umi, how often did we acutally see it
+            // remember, theres 3 mutation at each position so we have to sum up
+            let current_freq = n_shadows_per_pos.entry(pos).or_insert(0);
+            *current_freq += f;
             n_shadows_per_pos.insert(pos, *f);
         }
         else{
-            n_shadows_per_pos.insert(pos, 0);
+            n_shadows_per_pos.entry(pos).or_insert(0);
         }
     }
     n_shadows_per_pos
 }
 
 
-fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
+pub fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
     // return the three 1BP mutations of a sequence at the given position"
     let mut muts = Vec::with_capacity(3);
 
@@ -143,4 +148,76 @@ fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
         }
     }
     return muts
+}
+
+pub fn run(fastq_file: String, whitelist_file: String, output_csv_file: String){
+
+    // parse whitelist
+    let whitelist = parse_whitelist_gz(whitelist_file);
+    println!("Whitelist len {}", whitelist.len());
+
+    
+    let mut countmap = count_cb_umi(fastq_file);
+    // transform into shadow counter
+    println!("len of counter {}", countmap.len());
+
+    // filter for whitelist only entries
+    println!("Filtering for whilelist");
+
+    let mut keys_to_remove: Vec<(String, String)> = Vec::new();
+    for ((cb, umi), _count) in countmap.iter(){
+        if !whitelist.contains(cb){
+            keys_to_remove.push((cb.clone(), umi.clone()));
+        }
+    }
+
+    for k in keys_to_remove{
+        countmap.remove(&k);
+    }
+
+    println!("len of filtered counter {}", countmap.len());
+    // unstable:
+    // countmap.drain_filter(|k, v| {
+    //     k.0 == k.1
+    // });
+
+    // now the hard part: group by CB, look at all UMIs therein
+    println!("calculating most common");
+    let most_common: Vec<(String,String)> = top_n(&countmap, 1000);
+    println!("most common {:?}", most_common.len());
+
+    // for each entry in most common, find potential shadows
+    // add them to polars
+    let mut polars_data: HashMap<String, Vec<i32>> = HashMap::new();
+
+    for mc in most_common{
+        let mc2 = mc.clone();
+        let nshadows_per_position = find_shadows(mc, &countmap);
+        for (position, n_shadows) in nshadows_per_position.iter(){
+            if *n_shadows > 0 {
+                println!("shadows {:?}", nshadows_per_position);
+                // panic!("FOUND")
+
+            }
+            polars_data.entry(format!("position_{position}")).or_insert(vec![]).push(*n_shadows)
+        }
+        let total_counts = countmap.get(&mc2).unwrap();
+        polars_data.entry("total".into()).or_insert(vec![]).push(*total_counts)
+
+    }
+    
+    // to polars dataframe
+    let mut df = DataFrame::new(
+        polars_data.into_iter()
+            .map(|(name, values)| Series::new(&format!("{name}"), values))
+            .collect::<Vec<_>>()).unwrap();
+    
+    println!("{:?}", df);
+
+    // write to CSV
+    let mut output_file: File = File::create(output_csv_file).unwrap();
+    CsvWriter::new(&mut output_file)
+        .has_header(true)
+        .finish(&mut df)
+        .unwrap();        
 }
