@@ -189,35 +189,41 @@ pub fn run(fastq_file: String, whitelist_file: String, output_csv_file: String){
     // for each entry in most common, find potential shadows
     // add them to polars
     let mut polars_data: HashMap<String, Vec<i32>> = HashMap::new();
+    let mut cellnames: Vec<String> = Vec::new();
+    let mut umis: Vec<String> = Vec::new();
 
     for mc in most_common{
         let mc2 = mc.clone();
         let nshadows_per_position = find_shadows(mc, &countmap);
         for (position, n_shadows) in nshadows_per_position.iter(){
-            if *n_shadows > 0 {
-                println!("shadows {:?}", nshadows_per_position);
-                // panic!("FOUND")
-
-            }
+            // if *n_shadows > 0 {
+            //     println!("shadows {:?}", nshadows_per_position);
+            // }
             polars_data.entry(format!("position_{position}")).or_insert(vec![]).push(*n_shadows)
         }
         let total_counts = countmap.get(&mc2).unwrap();
-        polars_data.entry("total".into()).or_insert(vec![]).push(*total_counts)
+        polars_data.entry("total".into()).or_insert(vec![]).push(*total_counts);
 
+        cellnames.push(mc2.0);
+        umis.push(mc2.1);
     }
     
     // to polars dataframe
-    let mut df = DataFrame::new(
+    let df = DataFrame::new(
         polars_data.into_iter()
             .map(|(name, values)| Series::new(&format!("{name}"), values))
             .collect::<Vec<_>>()).unwrap();
-    
-    println!("{:?}", df);
+
+    let df_cb = Series::new("CB", cellnames);
+    let df_umi = Series::new("UMI", umis);
+
+    let mut df_final = df.hstack(&[df_cb, df_umi]).unwrap();    
+    println!("{:?}", df_final);
 
     // write to CSV
     let mut output_file: File = File::create(output_csv_file).unwrap();
     CsvWriter::new(&mut output_file)
         .has_header(true)
-        .finish(&mut df)
+        .finish(&mut df_final)
         .unwrap();        
 }

@@ -1,15 +1,10 @@
-mod myfastq;
-mod sqlite;
-mod hset;
+// mod myfastq;
+// mod sqlite;
+// mod hset;
 mod cb_umi_errors;
 mod cb_errors;
 // use fastq::{parse_path, Record, Parser};
 // use std::env::args;
-use std::collections::{HashMap};
-use std::fs::File;
-use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
-
-
 
 
 fn main() {
@@ -24,12 +19,12 @@ fn main() {
     // let whitelist_file: String = "/home/michi/3M-february-2018.txt.gz".into();
     let whitelist_file: String = "/home/michi/mounts/TB4drive/kallisto_resources/3M-february-2018.txt.gz".into();
  
-    // cb_umi_errors::run(fastq_file, whitelist_file, "/tmp/out_cb_umi.csv".to_string());
+    cb_umi_errors::run(fastq_file, whitelist_file, "/tmp/out_cb_umi.csv".to_string());
 
 
     let fastq_file: String = "/home/michi/mounts/TB4drive/ISB_data/LT_pilot/LT_pilot/raw_data/Fresh1/Fresh1_CKDL210025651-1a-SI_TT_C2_HVWMHDSX2_S2_L001_R1_001.fastq.gz".into();
     let whitelist_file: String = "/home/michi/mounts/TB4drive/kallisto_resources/3M-february-2018.txt.gz".into();
-
+    
     cb_errors::run(fastq_file, whitelist_file, "/tmp/out_cb.csv".to_string())
 
 

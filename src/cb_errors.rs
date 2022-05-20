@@ -5,7 +5,7 @@ use std::collections::{HashMap};
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
 use crate::cb_umi_errors::{parse_r1, get_1bp_mutations, parse_whitelist_gz};
-use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series, df};
+use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
 use std::fs::File;
 
 pub fn count_cb(fname: String) -> Counter<String, i32> {
@@ -25,7 +25,7 @@ pub fn count_cb(fname: String) -> Counter<String, i32> {
 
     for (i, l) in my_iter.enumerate(){
         if let Ok(line) = l{
-            if let Some((cb, umi)) = parse_r1(line){
+            if let Some((cb, _umi)) = parse_r1(line){
                 let counter = countermap.entry(cb).or_insert(0);
                 *counter += 1
             }
@@ -105,7 +105,7 @@ pub fn run(fastq_file: String, whitelist_file: String, output_csv_file: String){
     println!("Whitelist len {}", whitelist.len());
 
     
-    let mut countmap = count_cb(fastq_file);
+    let countmap = count_cb(fastq_file);
     println!("len of counter {}", countmap.len());
 
 
@@ -120,16 +120,19 @@ pub fn run(fastq_file: String, whitelist_file: String, output_csv_file: String){
 
     // for each entry in most common, find potential shadows
     // add them to polars
-    let mut polars_data: HashMap<String, Vec<i32>> = HashMap::new();
+    let mut polars_data: HashMap<String, Vec<i32>> = HashMap::new(); // building up the columns of the DataFrame: name->values
     let mut cellnames: Vec<String> = Vec::new();
 
     for mc in most_common_filtered{
         let mc2 = mc.clone();
+
+        // finding shadoes per position
         let nshadows_per_position = find_shadows(mc, &countmap);
+
         for (position, n_shadows) in nshadows_per_position.iter(){
-            if *n_shadows > 0 {
-                println!("shadows {:?}", nshadows_per_position);
-            }
+            // if *n_shadows > 0 {
+            //     println!("shadows {:?}", nshadows_per_position);
+            // }
             polars_data.entry(format!("position_{position}")).or_insert(vec![]).push(*n_shadows)
         }
         let total_counts = countmap.get(&mc2).unwrap();
@@ -138,7 +141,7 @@ pub fn run(fastq_file: String, whitelist_file: String, output_csv_file: String){
     }
     
     // to polars dataframe
-    let mut df = DataFrame::new(
+    let df = DataFrame::new(
         polars_data.into_iter()
             .map(|(name, values)| Series::new(&format!("{name}"), values))
             .collect::<Vec<_>>()).unwrap();
@@ -156,20 +159,20 @@ pub fn run(fastq_file: String, whitelist_file: String, output_csv_file: String){
         .unwrap();        
 
 
-    // countmap into csv
-    let mut cb: Vec<String> = Vec::new();
-    let mut freq: Vec<i32> = Vec::new();
-    for (c, f) in countmap.into_iter(){
-        cb.push(c);
-        freq.push(f);
-    }
-    let series_cb = Series::new("CB", cb);
-    let series_freq = Series::new("frequency", freq);
-    let mut df_readcounter = DataFrame::new(vec![series_cb, series_freq]).unwrap();
+    // // countmap into csv
+    // let mut cb: Vec<String> = Vec::new();
+    // let mut freq: Vec<i32> = Vec::new();
+    // for (c, f) in countmap.into_iter(){
+    //     cb.push(c);
+    //     freq.push(f);
+    // }
+    // let series_cb = Series::new("CB", cb);
+    // let series_freq = Series::new("frequency", freq);
+    // let mut df_readcounter = DataFrame::new(vec![series_cb, series_freq]).unwrap();
 
-    let mut output_file: File = File::create("/tmp/read_counter.csv").unwrap();
-    CsvWriter::new(&mut output_file)
-        .has_header(true)
-        .finish(&mut df_readcounter)
-        .unwrap();      
+    // let mut output_file: File = File::create("/tmp/read_counter.csv").unwrap();
+    // CsvWriter::new(&mut output_file)
+    //     .has_header(true)
+    //     .finish(&mut df_readcounter)
+    //     .unwrap();      
 }
