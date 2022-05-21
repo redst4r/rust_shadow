@@ -148,12 +148,25 @@ pub fn run_top(fastq_list: Vec<String>){
 }
 
 
-struct GreaterThan1Bloom {
+pub struct GreaterThan1Bloom {
     minsketch : CountMinSketch<String, u32>,  // for storing items seen once
-    greater_than_1_items : HashSet<String>
+    greater_than_1_items : HashSet<String>,
+    n_seen: u32  //keeping track of the number of seen items (i.e. #times add_item got called)
+
 }
 impl GreaterThan1Bloom {
-    fn add_item(&mut self, item:&String){
+
+    pub fn new(probability: f64, tolerance: f64) -> GreaterThan1Bloom {
+        let ccc:CountMinSketch<String, u32> = CountMinSketch::new(probability, tolerance, {});
+        let v: HashSet<String> = HashSet::new();
+        GreaterThan1Bloom {
+            minsketch: ccc,
+            greater_than_1_items: v,
+            n_seen: 0
+        }
+    }
+
+    pub fn add_item(&mut self, item:&String){
 
         let current_freq = self.minsketch.get(item);
         // println!("Adding item {item}, current freq = {current_freq}");
@@ -164,10 +177,17 @@ impl GreaterThan1Bloom {
         else{
             self.greater_than_1_items.insert(item.clone());
         }
+        self.n_seen += 1;
 
         // println!("Current #>1 {}", self.greater_than_1_items.len())
     }
+
+    pub fn status(&self){
+        let n_items_g1 = self.greater_than_1_items.len();
+        println!("Stored items (f>1) {n_items_g1}. Total items seen {}. Efficiency {:.4}", self.n_seen, (n_items_g1 as f32)/(self.n_seen as f32))
+    }
 }
+
 
 pub fn run_gt1(fastq_list: Vec<String>){
 
@@ -194,9 +214,11 @@ pub fn run_gt1(fastq_list: Vec<String>){
     let mut ccc:CountMinSketch<String, u32> = CountMinSketch::new(probability, tolerance, {});
     let mut v: HashSet<String> = HashSet::new();
 
+    // TODO: stupdi to use without constructor
     let mut GE = GreaterThan1Bloom {
         minsketch : ccc,
-        greater_than_1_items : v
+        greater_than_1_items : v,
+        n_seen: 0
     };
 
     let mut countermap: Counter<String, u32> = Counter::new();
@@ -255,7 +277,7 @@ pub fn run(fastq_list: Vec<String>){
             let reader = BufReader::new(decoder);
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1).take(10_000_000);
+                .map(|x| x.1);
             my_iter
         }
         );
