@@ -8,7 +8,7 @@ use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::utils::{parse_whitelist_gz,parse_r1, get_1bp_mutations, write_to_csv};
-
+use crate::utils::CbUmi;
 
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), u32> {

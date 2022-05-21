@@ -23,8 +23,8 @@ use crate::sketching::{GreaterThan1Bloom};
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use streaming_algorithms::{Top};
-use indicatif::ProgressIterator;
-use indicatif::ProgressBar;
+// use indicatif::ProgressIterator;
+// use indicatif::ProgressBar;
 
 
 const TOTAL_READS: usize = 50_000_000;
@@ -96,10 +96,9 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
         // however the mutate function doesnt work with that
         // lets turn it into a plain CBUMI string, mutate and turn back to CB_UMI
         let seq_cbumi = CbUmi::from_string(seq);
-        let seq_plain = format!("{}{}", seq_cbumi.cb, seq_cbumi.umi);
-        let shadows_plain: Vec<String> = (0..28).flat_map(|pos| get_1bp_mutations(&seq_plain, pos)).collect();
-        // let shadows = shadows_plain.iter().map(|CBUMI| format!("{}_{}", &CBUMI[0..16], &CBUMI[16..28]));
-        let shadows = shadows_plain.iter()
+        let seq_plain = format!("{}{}", seq_cbumi.cb, seq_cbumi.umi);  // turn into single string
+        let shadows_plain: Vec<String> = (0..28).flat_map(|pos| get_1bp_mutations(&seq_plain, pos)).collect();  // apply mutations at all positions
+        let shadows = shadows_plain.iter() // convert back to CbUmi
             .map(|CBUMI| CbUmi{ 
                 cb: (&CBUMI[0..16]).to_string(), 
                 umi: (&CBUMI[16..28]).to_string()
