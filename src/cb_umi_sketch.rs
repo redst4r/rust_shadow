@@ -23,8 +23,11 @@ use crate::sketching::{GreaterThan1Bloom};
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use streaming_algorithms::{Top};
+use indicatif::ProgressIterator;
+use indicatif::ProgressBar;
 
-const TOTAL_READS: usize = 50_000_000;
+
+const TOTAL_READS: usize = 10_000_000;
 
 
 pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
@@ -51,27 +54,31 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     //--------------------------
     // first pass over data
     // keepign track of the topN elements in  the approximate counter
+    // however, only add XB/UMI that are whitelisted
     let topn = 10000; 
     let tol = 1e-8;
     let prob = 0.000001;
     let mut ccc:Top<String, u32> = Top::new(topn, prob, tol, {});    
 
+    // let bar = ProgressBar::new_spinner();
     for (i, cbumi) in my_iter.enumerate(){
-        // if let Ok(line) = l{
-            // if let Some(cbumi) = parse_r1_struct(line){
-                let cm_umi_str = cbumi.to_string();
-                ccc.push(cm_umi_str, &1);
-            // }
-        // }
+
+        if !whitelist.contains(&cbumi.cb){
+            continue;
+        }
+
+        let cm_umi_str = cbumi.to_string();  //convert to CB_UMI string for hashing
+        ccc.push(cm_umi_str, &1);
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000);
-        }        
+        }
+        // bar.inc(1)
     }
+    // bar.finish();
 
-    // get the candidate list, 
+    println!("Done with first pass");
 
-
-    // now we have a candidate list 
+    // now we have a candidate list, all are valid CB accodinf to the whitelist
     // get their ACTUAL frequences and the frequencies of their shadows
     // first, lets build a list of all candidates and their shadows
     let mut candidates_and_shadows: Counter<String, u32> = Counter::new(); //::with_capacity( TOPN * 28 * 4);  // around 1M entries for N=10k
@@ -95,7 +102,7 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
         }
     }
 
-    // now go thorugh the fastqs again, recoding the frequencies of those items
+    // now go thorugh the fastqs again, recoding the TRUE frequencies of those items
 
     let file_iterators = fastq_list.into_iter()
         .map(|fname|{
@@ -105,6 +112,7 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
                 .enumerate().filter(|x| x.0 % 4 == 1)
                 .map(|x| x.1)
                 .filter_map(|line| line.ok()) //takes care of errors in file reading
+                .filter_map(|line| parse_r1_struct(line))
                 .take(TOTAL_READS);
             my_iter
         }
@@ -113,15 +121,13 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     let my_iter = file_iterators.flat_map(|x| x);
     println!("Second pass");
 
-    for (i, line) in my_iter.enumerate(){
-        if let Some(cbumi) = parse_r1_struct(line){
-            let cm_umi_str = cbumi.to_string();
-            if candidates_and_shadows.contains_key(&cm_umi_str){
-                let c = candidates_and_shadows.entry(cm_umi_str).or_insert(0);  // the INSERT SHOULD NEVER HAPPEN
-                // note that this will contain a 0 counter if we see the first read
-                // this is not from the or_insert!! but from out init
-                *c+=1;
-            }
+    for (i, cbumi) in my_iter.enumerate(){
+        let cm_umi_str = cbumi.to_string();
+        if candidates_and_shadows.contains_key(&cm_umi_str){
+            let c = candidates_and_shadows.entry(cm_umi_str).or_insert(0);  // the INSERT SHOULD NEVER HAPPEN
+            // note that this will contain a 0 counter if we see the first read
+            // this is not from the or_insert!! but from out init
+            *c+=1;
         }
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000);
@@ -129,17 +135,14 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     }
     println!("{}", candidates_and_shadows.len());
 
-
-
     // now we have all the actual counts!
-
     // identify the ACTUAL REAL reads () removing possible frequent shadows
     println!("convertin ");
 
     // convert candidates_and_shadows to String,String
     let mut countmap: Counter<(String, String), u32> = Counter::new();
+    
     let mut i = 0;
-
     // this is the actual 10k topN
     for (seq, _approx_freq) in ccc.iter(){
         let real_freq = candidates_and_shadows.get(seq).unwrap();
@@ -149,7 +152,13 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
         if whitelist.contains(&cbumi.cb){
             countmap.insert((cbumi.cb, cbumi.umi), *real_freq);
         }
+        else{
+            panic!("this shouldnt happen, its already filtered")
+        }
+        i+=1;
     }
+    assert_eq!(i, topn);
+
     println!("calculating most common; {}", countmap.len());
     let most_common: Vec<(String,String)> = top_n(&countmap, topn);
     println!("most common {:?}", most_common.len());
