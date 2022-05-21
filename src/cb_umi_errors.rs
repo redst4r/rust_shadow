@@ -6,13 +6,12 @@ use rust_htslib::bgzf;
 use std::collections::{HashMap, HashSet};
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
-use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
-use std::fs::File;
+use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::utils::{parse_whitelist_gz,parse_r1, get_1bp_mutations, write_to_csv};
 
 
 
-pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<(String, String), i32> {
+pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), u32> {
     // coutns the CB/UMI pairs in the fastq
 
     // reading the fastq.gz
@@ -34,7 +33,7 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<(String, String), i
 
     // parsing the lines, counting
     // let mut countermap: HashMap<(String, String), i32> = HashMap::new();
-    let mut countermap: Counter<(String, String), i32> = Counter::new();
+    let mut countermap: Counter<(String, String), u32> = Counter::new();
 
     for (i, l) in my_iter.enumerate(){
         if let Ok(line) = l{
@@ -50,7 +49,7 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<(String, String), i
     countermap
 }
 
-pub fn top_n(counter: &Counter<(String, String), i32>, n: i32) -> Vec<(String, String)>{
+pub fn top_n(counter: &Counter<(String, String), u32>, n: usize) -> Vec<(String, String)>{
 
     // gets the Top_n elements from the counter, making sure that
     // they are not shadows of other frequent elements
@@ -60,14 +59,21 @@ pub fn top_n(counter: &Counter<(String, String), i32>, n: i32) -> Vec<(String, S
     for ((cb, umi), _freq) in counter.most_common(){
 
         let cb_umi = format!("{cb}_{umi}");
-        if bk.find(cb_umi, 2).len() == 0{
+        let matches = bk.find(cb_umi, 2);
+        if matches.len() == 0{
             let cb_umi = format!("{cb}_{umi}");
             bk.insert(cb_umi);
             c += 1;
         }
+        else{
+            println!("Found {cb}_{umi} at freq {}, but redundant with {:?}", _freq, matches)
+        }
         if c >= n{
             break
         }
+        if c % 1_000 == 0{
+            println!("Iteration {c} of {n}");
+        }          
     }
 
     // for now, all the frequent CB/UMIs are the elements of the BKTree
@@ -83,7 +89,7 @@ pub fn top_n(counter: &Counter<(String, String), i32>, n: i32) -> Vec<(String, S
     top2
 }
 
-pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, String), i32>) -> HashMap<usize, i32>{
+pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, String), u32>) -> HashMap<usize, u32>{
     // for a given "true" CB/UMI find the number of shadowed reads (i.e. reads with a single subsitution)
     // and count their number (position specific)
     // we get a dcitionary with position -> #shadow reads
@@ -99,7 +105,7 @@ pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, St
     }
     // println!("{:?}", all_muts);
 
-    let mut n_shadows_per_pos: HashMap<usize, i32> = HashMap::new();
+    let mut n_shadows_per_pos: HashMap<usize, u32> = HashMap::new();
     for (cb, umi, pos) in all_muts{
         if let Some(f) = filtered_map.get(&(cb, umi)){
             // for that shadow cb/umi, how often did we acutally see it
@@ -118,7 +124,9 @@ pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, St
 
 
 
-pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: String){
+pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
+
+    let topn = 10000;
 
     // parse whitelist
     let whitelist = parse_whitelist_gz(whitelist_file);
@@ -151,12 +159,12 @@ pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: Str
 
     // now the hard part: group by CB, look at all UMIs therein
     println!("calculating most common");
-    let most_common: Vec<(String,String)> = top_n(&countmap, 1000);
+    let most_common: Vec<(String,String)> = top_n(&countmap, topn);
     println!("most common {:?}", most_common.len());
 
     // for each entry in most common, find potential shadows
     // add them to polars
-    let mut polars_data: HashMap<String, Vec<i32>> = HashMap::new();
+    let mut polars_data: HashMap<String, Vec<u32>> = HashMap::new();
     let mut cellnames: Vec<String> = Vec::new();
     let mut umis: Vec<String> = Vec::new();
 
