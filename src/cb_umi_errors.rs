@@ -65,9 +65,9 @@ pub fn top_n(counter: &Counter<(String, String), u32>, n: usize) -> Vec<(String,
             bk.insert(cb_umi);
             c += 1;
         }
-        else{
-            println!("Found {cb}_{umi} at freq {}, but redundant with {:?}", _freq, matches)
-        }
+        // else{
+        //     println!("Found {cb}_{umi} at freq {}, but redundant with {:?}", _freq, matches)
+        // }
         if c >= n{
             break
         }
@@ -94,25 +94,27 @@ pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, St
     // and count their number (position specific)
     // we get a dcitionary with position -> #shadow reads
     //
-    let (cb, umi) = cb_umi;
+    let (cb_orig, umi_orig) = cb_umi;
 
     let mut all_muts: Vec<(String, String, usize)>= Vec::new();  // cb, umi, pos
-    for pos in 0..umi.len() {
-        for m in get_1bp_mutations(&umi, pos){
-            let c2 = cb.clone();
+    for pos in 0..umi_orig.len() {
+        for m in get_1bp_mutations(&umi_orig, pos){
+            let c2 = cb_orig.clone();
             all_muts.push((c2, m, pos));
         }
     }
-    // println!("{:?}", all_muts);
+
 
     let mut n_shadows_per_pos: HashMap<usize, u32> = HashMap::new();
     for (cb, umi, pos) in all_muts{
+        let cb2 = cb.clone();
+        let umi2 = umi.clone();
+
         if let Some(f) = filtered_map.get(&(cb, umi)){
             // for that shadow cb/umi, how often did we acutally see it
             // remember, theres 3 mutation at each position so we have to sum up
             let current_freq = n_shadows_per_pos.entry(pos).or_insert(0);
             *current_freq += f;
-            n_shadows_per_pos.insert(pos, *f);
         }
         else{
             n_shadows_per_pos.entry(pos).or_insert(0);

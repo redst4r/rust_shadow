@@ -27,11 +27,10 @@ use indicatif::ProgressIterator;
 use indicatif::ProgressBar;
 
 
-const TOTAL_READS: usize = 10_000_000;
+const TOTAL_READS: usize = 50_000_000;
 
 
 pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
-    
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
@@ -44,7 +43,8 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
                 .map(|x| x.1)
                 .filter_map(|line| line.ok()) //takes care of errors in file reading
                 .filter_map(|line| parse_r1_struct(line))
-                .take(TOTAL_READS);
+                // .take(TOTAL_READS)
+                ;
             my_iter
         }
         );
@@ -121,7 +121,8 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
                 .map(|x| x.1)
                 .filter_map(|line| line.ok()) //takes care of errors in file reading
                 .filter_map(|line| parse_r1_struct(line))
-                .take(TOTAL_READS);
+                // .take(TOTAL_READS)
+                ;
             my_iter
         }
         );
