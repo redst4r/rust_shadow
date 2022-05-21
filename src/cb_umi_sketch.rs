@@ -81,12 +81,14 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     // now we have a candidate list, all are valid CB accodinf to the whitelist
     // get their ACTUAL frequences and the frequencies of their shadows
     // first, lets build a list of all candidates and their shadows
-    let mut candidates_and_shadows: Counter<String, u32> = Counter::new(); //::with_capacity( TOPN * 28 * 4);  // around 1M entries for N=10k
+    let mut candidates_and_shadows: Counter<CbUmi, u32> = Counter::new(); //::with_capacity( TOPN * 28 * 4);  // around 1M entries for N=10k
     
     for (seq, _approx_freq) in ccc.iter(){
+        let seq_cbumi = CbUmi::from_string(seq);
+        
         // insert the sequence itself 
-        let qqq = seq.clone(); //qqq is of the form String: CB_UMI
-        candidates_and_shadows.insert( qqq, 0);
+        // let qqq = seq.clone(); //qqq is of the form String: CB_UMI
+        candidates_and_shadows.insert( seq_cbumi, 0);
         
         // insert all its potential shadows across positions
 
@@ -96,7 +98,13 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
         let seq_cbumi = CbUmi::from_string(seq);
         let seq_plain = format!("{}{}", seq_cbumi.cb, seq_cbumi.umi);
         let shadows_plain: Vec<String> = (0..28).flat_map(|pos| get_1bp_mutations(&seq_plain, pos)).collect();
-        let shadows = shadows_plain.iter().map(|CBUMI| format!("{}_{}", &CBUMI[0..16], &CBUMI[16..28]));
+        // let shadows = shadows_plain.iter().map(|CBUMI| format!("{}_{}", &CBUMI[0..16], &CBUMI[16..28]));
+        let shadows = shadows_plain.iter()
+            .map(|CBUMI| CbUmi{ 
+                cb: (&CBUMI[0..16]).to_string(), 
+                umi: (&CBUMI[16..28]).to_string()
+            });
+
         for s in shadows{
             candidates_and_shadows.insert( s, 0);
         }
@@ -122,9 +130,8 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     println!("Second pass");
 
     for (i, cbumi) in my_iter.enumerate(){
-        let cm_umi_str = cbumi.to_string();
-        if candidates_and_shadows.contains_key(&cm_umi_str){
-            let c = candidates_and_shadows.entry(cm_umi_str).or_insert(0);  // the INSERT SHOULD NEVER HAPPEN
+        if candidates_and_shadows.contains_key(&cbumi){
+            let c = candidates_and_shadows.entry(cbumi).or_insert(0);  // the INSERT SHOULD NEVER HAPPEN
             // note that this will contain a 0 counter if we see the first read
             // this is not from the or_insert!! but from out init
             *c+=1;
@@ -145,9 +152,10 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     let mut i = 0;
     // this is the actual 10k topN
     for (seq, _approx_freq) in ccc.iter(){
-        let real_freq = candidates_and_shadows.get(seq).unwrap();
-
         let cbumi = CbUmi::from_string(seq);
+        let real_freq = candidates_and_shadows.get(&cbumi).unwrap();
+
+        // let cbumi = CbUmi::from_string(seq);
         // let cbumi = parse_r1_struct((*seq).clone()).unwrap();
         if whitelist.contains(&cbumi.cb){
             countmap.insert((cbumi.cb, cbumi.umi), *real_freq);
@@ -159,6 +167,7 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     }
     assert_eq!(i, topn);
 
+
     println!("calculating most common; {}", countmap.len());
     let most_common: Vec<(String,String)> = top_n(&countmap, topn);
     println!("most common {:?}", most_common.len());
@@ -169,9 +178,8 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
 
     // argh!! convert candidates_and_shadows tp <String,String>,u32
     let mut fmap: Counter<(String, String), u32> = Counter::new();
-    for (seq, true_freq) in candidates_and_shadows.iter(){
-        let cbumi = CbUmi::from_string(seq);
-        fmap.insert((cbumi.cb, cbumi.umi), *true_freq);
+    for (cbumi, true_freq) in candidates_and_shadows.into_iter(){
+        fmap.insert((cbumi.cb, cbumi.umi), true_freq);
     }
 
 
@@ -182,6 +190,7 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     for mc in most_common{
         let mc2 = mc.clone();
         let nshadows_per_position = find_shadows(mc, &fmap);
+
         for (position, n_shadows) in nshadows_per_position.iter(){
             // if *n_shadows > 0 {
             //     println!("shadows {:?}", nshadows_per_position);

@@ -47,6 +47,7 @@ pub fn parse_r1_struct(seq: String) -> Option<CbUmi>{
     // }
 }
 
+#[derive(Hash, PartialEq, Eq)]
 pub struct CbUmi{
     pub cb: String,
     pub umi: String,
