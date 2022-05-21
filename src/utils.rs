@@ -2,7 +2,7 @@ use std::io::BufReader;
 use std::io::BufRead;
 use rust_htslib::bgzf;
 use std::collections::{HashMap, HashSet};
-use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
+use polars::prelude::{CsvWriter, DataFrame, SerWriter};
 use std::fs::File;
 
 
@@ -48,14 +48,23 @@ pub fn parse_r1_struct(seq: String) -> Option<CbUmi>{
 }
 
 pub struct CbUmi{
-    cb: String,
-    umi: String,
+    pub cb: String,
+    pub umi: String,
 }
 
 impl CbUmi {
     pub fn to_string(&self) -> String{
         format!("{}_{}", self.cb, self.umi)
     }
+    pub fn from_string(s:&String) -> CbUmi{
+        let mut split = s.split('_');
+        let cb = split.next().expect(s);
+        let umi = split.next().expect(s);
+        CbUmi {
+            cb: cb.to_string(), 
+            umi: umi.to_string()
+        }
+    } 
 }
 
 
@@ -81,20 +90,20 @@ pub fn set_comparison<T>(set_a: &HashSet<T>,set_b: &HashSet<T>)
 {
     // warning: this instantiates all the sets
     // instead, just iterate over them
-    let intersect = set_a.intersection(set_b).collect::<Vec<&T>>();
-    let AminusB = set_a.difference(set_b).collect::<Vec<&T>>();
-    let BminusA = set_b.difference(set_a).collect::<Vec<&T>>();
-    println!("|A&B| {} |A-B| {}  |B-A|{}", intersect.len(), AminusB.len(), BminusA.len());
+    // let intersect = set_a.intersection(set_b).collect::<Vec<&T>>();
+    // let AminusB = set_a.difference(set_b).collect::<Vec<&T>>();
+    // let BminusA = set_b.difference(set_a).collect::<Vec<&T>>();
+    // println!("|A&B| {} |A-B| {}  |B-A|{}", intersect.len(), AminusB.len(), BminusA.len());
 
     // let n_intersect = set_a.intersection(set_b).fold(0, |accum, _item| accum+1);
-    // let n_AminusB = set_a.difference(set_b).fold(0, |accum, _item| accum+1);
+    // let n_A_minus_B = set_a.difference(set_b).fold(0, |accum, _item| accum+1);
     // let n_BminusA = set_b.difference(set_a).fold(0, |accum, _item| accum+1);
 
     let n_intersect = set_a.intersection(set_b).count();
-    let n_AminusB = set_a.difference(set_b).count();
-    let n_BminusA = set_b.difference(set_a).count();
+    let n_a_minus_b = set_a.difference(set_b).count();
+    let n_bminus_a = set_b.difference(set_a).count();
 
-    println!("|A&B| {} |A-B| {}  |B-A|{}", n_intersect, n_AminusB, n_BminusA);
+    println!("|A&B| {} |A-B| {}  |B-A|{}", n_intersect, n_a_minus_b, n_bminus_a);
 
 }
 
