@@ -22,7 +22,9 @@ pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), 
             let reader = BufReader::new(decoder);
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1);
+                .map(|x| x.1)
+                .filter_map(|line| line.ok()); //takes care of errors in file reading
+
             my_iter
         }
         );
@@ -35,12 +37,10 @@ pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), 
     // let mut countermap: HashMap<(String, String), i32> = HashMap::new();
     let mut countermap: Counter<(String, String), u32> = Counter::new();
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some((cb, umi)) = parse_r1(line){
-                let counter = countermap.entry((cb, umi)).or_insert(0);
-                *counter += 1
-            }
+    for (i, line) in my_iter.enumerate(){
+        if let Some((cb, umi)) = parse_r1(line){
+            let counter = countermap.entry((cb, umi)).or_insert(0);
+            *counter += 1
         }
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000)

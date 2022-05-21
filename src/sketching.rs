@@ -69,7 +69,9 @@ pub fn run_top(fastq_list: Vec<String>){
             let reader = BufReader::new(decoder);
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1);
+                .map(|x| x.1)
+                .filter_map(|line| line.ok()); //takes care of errors in file reading
+                
             my_iter
         }
         );
@@ -85,18 +87,16 @@ pub fn run_top(fastq_list: Vec<String>){
     let mut ccc:Top<String, u32> = Top::new(TOPN, probability, tolerance, {});
     let mut countermap: Counter<String, u32> = Counter::new();
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some((cb, _umi)) = parse_r1(line){
-                let cb_umi = format!("{cb}_{_umi}");
-                let cb_umi2 = format!("{cb}_{_umi}");
+    for (i, line) in my_iter.enumerate(){
+        if let Some((cb, _umi)) = parse_r1(line){
+            let cb_umi = format!("{cb}_{_umi}");
+            let cb_umi2 = format!("{cb}_{_umi}");
 
-                // let cb2 = cb.clone();
-                let counter = countermap.entry(cb_umi).or_insert(0);
-                *counter += 1;
+            // let cb2 = cb.clone();
+            let counter = countermap.entry(cb_umi).or_insert(0);
+            *counter += 1;
 
-                ccc.push(cb_umi2, &1);
-            }
+            ccc.push(cb_umi2, &1);
         }
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000)

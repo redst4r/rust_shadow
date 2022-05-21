@@ -38,28 +38,31 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
             let reader = BufReader::new(decoder);
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1).take(TOTAL_READS);
+                .map(|x| x.1)
+                .filter_map(|line| line.ok()) //takes care of errors in file reading
+                .filter_map(|line| parse_r1_struct(line))
+                .take(TOTAL_READS);
             my_iter
         }
         );
     // chaining, flatmapping all the iterators into a single one
     let my_iter = file_iterators.flat_map(|x| x);
     
-    // first pass over data, storing all elements #>1
-
+    //--------------------------
+    // first pass over data
+    // keepign track of the topN elements in  the approximate counter
     let topn = 10000; 
     let tol = 1e-8;
-    let prob = 0.00001;
-
+    let prob = 0.000001;
     let mut ccc:Top<String, u32> = Top::new(topn, prob, tol, {});    
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some(cbumi) = parse_r1_struct(line){
+    for (i, cbumi) in my_iter.enumerate(){
+        // if let Ok(line) = l{
+            // if let Some(cbumi) = parse_r1_struct(line){
                 let cm_umi_str = cbumi.to_string();
-                ccc.push(cm_umi_str, &1)
-            }
-        }
+                ccc.push(cm_umi_str, &1);
+            // }
+        // }
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000);
         }        
@@ -100,7 +103,9 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
             let reader = BufReader::new(decoder);
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1).take(TOTAL_READS);
+                .map(|x| x.1)
+                .filter_map(|line| line.ok()) //takes care of errors in file reading
+                .take(TOTAL_READS);
             my_iter
         }
         );
@@ -108,16 +113,14 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     let my_iter = file_iterators.flat_map(|x| x);
     println!("Second pass");
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some(cbumi) = parse_r1_struct(line){
-                let cm_umi_str = cbumi.to_string();
-                if candidates_and_shadows.contains_key(&cm_umi_str){
-                    let c = candidates_and_shadows.entry(cm_umi_str).or_insert(0);  // the INSERT SHOULD NEVER HAPPEN
-                    // note that this will contain a 0 counter if we see the first read
-                    // this is not from the or_insert!! but from out init
-                    *c+=1;
-                }
+    for (i, line) in my_iter.enumerate(){
+        if let Some(cbumi) = parse_r1_struct(line){
+            let cm_umi_str = cbumi.to_string();
+            if candidates_and_shadows.contains_key(&cm_umi_str){
+                let c = candidates_and_shadows.entry(cm_umi_str).or_insert(0);  // the INSERT SHOULD NEVER HAPPEN
+                // note that this will contain a 0 counter if we see the first read
+                // this is not from the or_insert!! but from out init
+                *c+=1;
             }
         }
         if i % 1_000_000 == 0{
@@ -216,7 +219,10 @@ pub fn run_GB1(fastq_list: Vec<String>, whitelist_file: String, output_csv_file:
             let reader = BufReader::new(decoder);
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1).take(TOTAL_READS);
+                .map(|x| x.1)
+                .filter_map(|line| line.ok()) //takes care of errors in file reading
+                .take(TOTAL_READS);
+
             my_iter
         }
         );
@@ -228,12 +234,10 @@ pub fn run_GB1(fastq_list: Vec<String>, whitelist_file: String, output_csv_file:
     let prob = 1e-4;
     let mut GB1 :GreaterThan1Bloom<> = GreaterThan1Bloom::new(prob, tol);
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some(cbumi) = parse_r1_struct(line){
-                let cm_umi_str = cbumi.to_string();
-                GB1.add_item(&cm_umi_str)
-            }
+    for (i, line) in my_iter.enumerate(){
+        if let Some(cbumi) = parse_r1_struct(line){
+            let cm_umi_str = cbumi.to_string();
+            GB1.add_item(&cm_umi_str)
         }
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000);

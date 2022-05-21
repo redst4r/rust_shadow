@@ -21,7 +21,9 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
             let reader = BufReader::new(decoder);
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1);
+                .map(|x| x.1)
+                .filter_map(|line| line.ok()) //takes care of errors in file reading
+                ;
             my_iter
         }
         );
@@ -32,12 +34,10 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
     // parsing the lines, counting
     let mut countermap: Counter<String, i32> = Counter::new();
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some((cb, _umi)) = parse_r1(line){
-                let counter = countermap.entry(cb).or_insert(0);
-                *counter += 1
-            }
+    for (i, line) in my_iter.enumerate(){
+        if let Some((cb, _umi)) = parse_r1(line){
+            let counter = countermap.entry(cb).or_insert(0);
+            *counter += 1
         }
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000)
@@ -193,21 +193,5 @@ pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: Str
 
     // write to CSV
     write_to_csv(&mut df_final, output_csv_file);    
-    
-    // // countmap into csv
-    // let mut cb: Vec<String> = Vec::new();
-    // let mut freq: Vec<i32> = Vec::new();
-    // for (c, f) in countmap.into_iter(){
-    //     cb.push(c);
-    //     freq.push(f);
-    // }
-    // let series_cb = Series::new("CB", cb);
-    // let series_freq = Series::new("frequency", freq);
-    // let mut df_readcounter = DataFrame::new(vec![series_cb, series_freq]).unwrap();
 
-    // let mut output_file: File = File::create("/tmp/read_counter.csv").unwrap();
-    // CsvWriter::new(&mut output_file)
-    //     .has_header(true)
-    //     .finish(&mut df_readcounter)
-    //     .unwrap();      
 }
