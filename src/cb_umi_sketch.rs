@@ -133,8 +133,9 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     // identify the ACTUAL REAL reads () removing possible frequent shadows
     println!("convertin ");
 
-    // convert candidates_and_shadows to String,String
-    let mut countmap: Counter<(String, String), u32> = Counter::new();
+    // collect the topN CUs and their ACTUAL counts (ccc only stores the approximate counts)
+    // this should be done by a toolz.valmap!!
+    let mut countmap: Counter<CbUmi, u32> = Counter::new();
     
     let mut i = 0;
     // this is the actual 10k topN
@@ -145,7 +146,7 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
         // let cbumi = CbUmi::from_string(seq);
         // let cbumi = parse_r1_struct((*seq).clone()).unwrap();
         if whitelist.contains(&cbumi.cb){
-            countmap.insert((cbumi.cb, cbumi.umi), *real_freq);
+            countmap.insert(cbumi, *real_freq);
         }
         else{
             panic!("this shouldnt happen, its already filtered")
@@ -156,18 +157,18 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
 
 
     println!("calculating most common; {}", countmap.len());
-    let most_common: Vec<(String,String)> = top_n(&countmap, topn);
+    let most_common: Vec<CbUmi> = top_n(&countmap, topn);
     println!("most common {:?}", most_common.len());
 
 
     // for each entry in most common, find potential shadows
     // add them to polars
 
-    // argh!! convert candidates_and_shadows tp <String,String>,u32
-    let mut fmap: Counter<(String, String), u32> = Counter::new();
-    for (cbumi, true_freq) in candidates_and_shadows.into_iter(){
-        fmap.insert((cbumi.cb, cbumi.umi), true_freq);
-    }
+    // // argh!! convert candidates_and_shadows tp <String,String>,u32
+    // let mut fmap: Counter<(String, String), u32> = Counter::new();
+    // for (cbumi, true_freq) in candidates_and_shadows.into_iter(){
+    //     fmap.insert((cbumi.cb, cbumi.umi), true_freq);
+    // }
 
 
     let mut polars_data: HashMap<String, Vec<u32>> = HashMap::new();
@@ -176,19 +177,16 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
 
     for mc in most_common{
         let mc2 = mc.clone();
-        let nshadows_per_position = find_shadows(mc, &fmap);
+        let nshadows_per_position = find_shadows(mc, &candidates_and_shadows);
 
         for (position, n_shadows) in nshadows_per_position.iter(){
-            // if *n_shadows > 0 {
-            //     println!("shadows {:?}", nshadows_per_position);
-            // }
             polars_data.entry(format!("position_{position}")).or_insert(vec![]).push(*n_shadows)
         }
         let total_counts = countmap.get(&mc2).unwrap();
         polars_data.entry("total".into()).or_insert(vec![]).push(*total_counts);
 
-        cellnames.push(mc2.0);
-        umis.push(mc2.1);
+        cellnames.push(mc2.cb);
+        umis.push(mc2.umi);
     }
 
     // to polars dataframe

@@ -57,7 +57,7 @@ pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
 
     for (cb, _freq) in counter.most_common(){
         let cb2 = cb.clone();  // TODO stupid cloing to be able to insert
-        if bk.find(cb, 2).len() == 0{
+        if bk.find(cb, 1).len() == 0{
             // let cb_umi = format!("{cb}_{umi}");
             bk.insert(cb2);   // TODO stupid cloing to be able to insert
             c += 1;

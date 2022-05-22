@@ -10,7 +10,7 @@ use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::utils::{parse_whitelist_gz,parse_r1_struct, write_to_csv, all_mutations_for_cbumi, CbUmi};
 
 
-pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), u32> {
+pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<CbUmi, u32> {
     // coutns the CB/UMI pairs in the fastq
 
     // reading the fastq.gz
@@ -32,12 +32,12 @@ pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), 
 
 
     // parsing the lines, counting
-    // let mut countermap: HashMap<(String, String), i32> = HashMap::new();
-    let mut countermap: Counter<(String, String), u32> = Counter::new();
+    // let mut countermap: HashMap<CbUmi, i32> = HashMap::new();
+    let mut countermap: Counter<CbUmi, u32> = Counter::new();
 
     for (i, line) in my_iter.enumerate(){
-        if let Some((cb, umi)) = parse_r1(line){
-            let counter = countermap.entry((cb, umi)).or_insert(0);
+        if let Some(cbumi) = parse_r1_struct(line){
+            let counter = countermap.entry(cbumi).or_insert(0);
             *counter += 1
         }
         if i % 1_000_000 == 0{
@@ -47,25 +47,23 @@ pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), 
     countermap
 }
 
-pub fn top_n(counter: &Counter<(String, String), u32>, n: usize) -> Vec<(String, String)>{
+pub fn top_n(counter: &Counter<CbUmi, u32>, n: usize) -> Vec<CbUmi>{
 
     // gets the Top_n elements from the counter, making sure that
     // they are not shadows of other frequent elements
     let mut bk: BkTree<String> = BkTree::new(levenshtein_distance);
 
     let mut c = 0;
-    for ((cb, umi), _freq) in counter.most_common(){
+    for (cbumi, _freq) in counter.most_common(){
 
-        let cb_umi = format!("{cb}_{umi}");
-        let matches = bk.find(cb_umi, 2);
+        let cb_umi_str = cbumi.to_string();
+        let matches = bk.find(cb_umi_str, 1);
         if matches.len() == 0{
-            let cb_umi = format!("{cb}_{umi}");
-            bk.insert(cb_umi);
+            let cb_umi_str =  cbumi.to_string();
+            bk.insert(cb_umi_str);
             c += 1;
         }
-        // else{
-        //     println!("Found {cb}_{umi} at freq {}, but redundant with {:?}", _freq, matches)
-        // }
+
         if c >= n{
             break
         }
@@ -76,23 +74,22 @@ pub fn top_n(counter: &Counter<(String, String), u32>, n: usize) -> Vec<(String,
 
     // for now, all the frequent CB/UMIs are the elements of the BKTree
     // put them into a vector
-    let mut top2: Vec<(String,String)> = Vec::new();
+    let mut top2: Vec<CbUmi> = Vec::new();
 
     for element in bk.into_iter(){
-        let mut cb_umi = element.split('_');
-        let cb = cb_umi.next().unwrap();
-        let umi = cb_umi.next().unwrap();
-        top2.push((String::from(cb), String::from(umi)));
+        let cb_umi = CbUmi::from_string(&element);
+        top2.push(cb_umi);
     }
     top2
 }
 
-pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, String), u32>) -> HashMap<usize, u32>{
+pub fn find_shadows(cb_umi: CbUmi, filtered_map: &Counter<CbUmi, u32>) -> HashMap<usize, u32>{
     // for a given "true" CB/UMI find the number of shadowed reads (i.e. reads with a single subsitution)
     // and count their number (position specific)
     // we get a dcitionary with position -> #shadow reads
     //
-    let (cb_orig, umi_orig) = cb_umi;
+    
+    // let (cb_orig, umi_orig) = (cb_umi.cb, cb_umi.umi);//todo why is this not linted as unused
 
     let all_muts = all_mutations_for_cbumi(cb_umi);
 
@@ -106,18 +103,16 @@ pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, St
 
 
     let mut n_shadows_per_pos: HashMap<usize, u32> = HashMap::new();
-    for (cb, umi, pos) in all_muts{
-        let cb2 = cb.clone();
-        let umi2 = umi.clone();
+    for (cbumi, mutated_pos) in all_muts{
 
-        if let Some(f) = filtered_map.get(&(cb, umi)){
+        if let Some(f) = filtered_map.get(&cbumi){
             // for that shadow cb/umi, how often did we acutally see it
             // remember, theres 3 mutation at each position so we have to sum up
-            let current_freq = n_shadows_per_pos.entry(pos).or_insert(0);
+            let current_freq = n_shadows_per_pos.entry(mutated_pos).or_insert(0);
             *current_freq += f;
         }
         else{
-            n_shadows_per_pos.entry(pos).or_insert(0);
+            n_shadows_per_pos.entry(mutated_pos).or_insert(0);
         }
     }
     n_shadows_per_pos
@@ -138,16 +133,16 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     // filter for whitelist only entries
     println!("Filtering for whilelist");
 
-    let mut keys_to_remove: Vec<(String, String)> = Vec::new();
-    for ((cb, umi), _count) in countmap.iter(){
-        if !whitelist.contains(cb){
-            keys_to_remove.push((cb.clone(), umi.clone()));
-        }
-    }
+    // let mut keys_to_remove: Vec<CbUmi> = Vec::new();
+    // for (cbumi, _count) in countmap.iter(){
+    //     if !whitelist.contains(&cbumi.cb){
+    //         keys_to_remove.push(cbumi.clone());
+    //     }
+    // }
 
-    for k in keys_to_remove{
-        countmap.remove(&k);
-    }
+    // for k in keys_to_remove{
+    //     countmap.remove(&k);
+    // }
 
     println!("len of filtered counter {}", countmap.len());
     // unstable:
@@ -157,7 +152,7 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
 
     // now the hard part: group by CB, look at all UMIs therein
     println!("calculating most common");
-    let most_common: Vec<(String,String)> = top_n(&countmap, topn);
+    let most_common: Vec<CbUmi> = top_n(&countmap, topn);
     println!("most common {:?}", most_common.len());
 
     // for each entry in most common, find potential shadows
@@ -167,19 +162,21 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     let mut umis: Vec<String> = Vec::new();
 
     for mc in most_common{
+
+        if !whitelist.contains(&mc.cb){
+            continue
+        }
+
         let mc2 = mc.clone();
         let nshadows_per_position = find_shadows(mc, &countmap);
         for (position, n_shadows) in nshadows_per_position.iter(){
-            // if *n_shadows > 0 {
-            //     println!("shadows {:?}", nshadows_per_position);
-            // }
             polars_data.entry(format!("position_{position}")).or_insert(vec![]).push(*n_shadows)
         }
         let total_counts = countmap.get(&mc2).unwrap();
         polars_data.entry("total".into()).or_insert(vec![]).push(*total_counts);
 
-        cellnames.push(mc2.0);
-        umis.push(mc2.1);
+        cellnames.push(mc2.cb);
+        umis.push(mc2.umi);
     }
     
     // to polars dataframe
