@@ -1,9 +1,7 @@
-// use std::io::{self, Read};
 use std::io::BufReader;
 use std::io::BufRead;
-// use flate2::read::GzDecoder;
 use rust_htslib::bgzf;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
 use polars::prelude::{DataFrame, NamedFrom, Series};

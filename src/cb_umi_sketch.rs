@@ -12,17 +12,16 @@
 // 
 //
 use counter::Counter;
-
 use std::io::BufReader;
 use std::io::BufRead;
 use rust_htslib::bgzf;
-use std::collections::{HashSet, HashMap};
+use std::collections::HashMap;
 use crate::utils::CbUmi;
 use crate::utils::{write_to_csv, parse_r1_struct, parse_whitelist_gz, all_mutations_for_cbumi};
-use crate::sketching::{GreaterThan1Bloom};
+use crate::sketching::GreaterThan1Bloom;
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};
-use streaming_algorithms::{Top};
+use streaming_algorithms::Top;
 // use indicatif::ProgressIterator;
 // use indicatif::ProgressBar;
 
@@ -163,13 +162,6 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
 
     // for each entry in most common, find potential shadows
     // add them to polars
-
-    // // argh!! convert candidates_and_shadows tp <String,String>,u32
-    // let mut fmap: Counter<(String, String), u32> = Counter::new();
-    // for (cbumi, true_freq) in candidates_and_shadows.into_iter(){
-    //     fmap.insert((cbumi.cb, cbumi.umi), true_freq);
-    // }
-
 
     let mut polars_data: HashMap<String, Vec<u32>> = HashMap::new();
     let mut cellnames: Vec<String> = Vec::new();
