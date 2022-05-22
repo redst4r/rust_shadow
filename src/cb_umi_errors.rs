@@ -23,7 +23,6 @@ pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), 
                 .enumerate().filter(|x| x.0 % 4 == 1)
                 .map(|x| x.1)
                 .filter_map(|line| line.ok()); //takes care of errors in file reading
-
             my_iter
         }
         );
@@ -125,11 +124,8 @@ pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, St
 }
 
 
+pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
 
-
-pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
-
-    let topn = 10000;
 
     // parse whitelist
     let whitelist = parse_whitelist_gz(whitelist_file);

@@ -30,7 +30,7 @@ use streaming_algorithms::{Top};
 const TOTAL_READS: usize = 50_000_000;
 
 
-pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
+pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
@@ -55,7 +55,6 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     // first pass over data
     // keepign track of the topN elements in  the approximate counter
     // however, only add XB/UMI that are whitelisted
-    let topn = 10000; 
     let tol = 1e-8;
     let prob = 0.000001;
     let mut ccc:Top<String, u32> = Top::new(topn, prob, tol, {});    

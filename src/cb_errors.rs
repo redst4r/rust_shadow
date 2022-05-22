@@ -47,38 +47,7 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
 }
 
 
-
-// pub fn count_cb(fname: String) -> Counter<String, i32> {
-//     // coutns the CB/UMI pairs in the fastq
-
-//     // reading the fastq.gz
-//     let decoder = bgzf::Reader::from_path(fname).unwrap();
-//     let reader = BufReader::new(decoder);
-//     let my_iter = reader.lines()
-//         .enumerate().filter(|x| x.0 % 4 == 1)
-//         .map(|x| x.1)
-//         ;//.take(1_000_000);
-
-
-//     // parsing the lines, counting
-//     let mut countermap: Counter<String, i32> = Counter::new();
-
-//     for (i, l) in my_iter.enumerate(){
-//         if let Ok(line) = l{
-//             if let Some((cb, _umi)) = parse_r1(line){
-//                 let counter = countermap.entry(cb).or_insert(0);
-//                 *counter += 1
-//             }
-//         }
-//         if i % 1_000_000 == 0{
-//             println!("Iteration {} Mio", i/1_000_000)
-//         }
-//     }
-//     countermap
-// }
-
-
-pub fn top_n(counter: &Counter<String, i32>, n: i32) -> Vec<String>{
+pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
 
     // gets the Top_n elements from the counter, making sure that
     // they are not shadows of other frequent elements
@@ -96,6 +65,9 @@ pub fn top_n(counter: &Counter<String, i32>, n: i32) -> Vec<String>{
         if c >= n{
             break
         }
+        if c % 1_000 == 0{
+            println!("Iteration {c} of {n}");
+        }          
     }
 
     // for now, all the frequent CB/UMIs are the elements of the BKTree
@@ -120,7 +92,6 @@ pub fn find_shadows(cb: String, filtered_map: &Counter<String, i32>) -> HashMap<
             all_muts.push((m, pos));
         }
     }
-    // println!("{:?}", all_muts);
 
     let mut n_shadows_per_pos: HashMap<usize, i32> = HashMap::new();
     for (cb, pos) in all_muts{
@@ -138,7 +109,7 @@ pub fn find_shadows(cb: String, filtered_map: &Counter<String, i32>) -> HashMap<
 }
 
 
-pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: String){
+pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
 
     // parse whitelist
     let whitelist = parse_whitelist_gz(whitelist_file);
@@ -151,7 +122,7 @@ pub fn run(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: Str
 
     // now the hard part: group by CB, look at all UMIs therein
     println!("calculating most common");
-    let most_common: Vec<String> = top_n(&countmap, 1000);
+    let most_common: Vec<String> = top_n(&countmap, topn);
     println!("most common {:?}", most_common.len());
 
     // filter the most common for whitelist
