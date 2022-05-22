@@ -18,7 +18,7 @@ use std::io::BufRead;
 use rust_htslib::bgzf;
 use std::collections::{HashSet, HashMap};
 use crate::utils::CbUmi;
-use crate::utils::{write_to_csv, parse_r1_struct, parse_whitelist_gz, get_1bp_mutations};
+use crate::utils::{write_to_csv, parse_r1_struct, parse_whitelist_gz, all_mutations_for_cbumi};
 use crate::sketching::{GreaterThan1Bloom};
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};
@@ -91,26 +91,14 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
         candidates_and_shadows.insert( seq_cbumi, 0);
         
         // insert all its potential shadows across positions
-
-        // this is a bit nasty: seq is separated by _ (CB_UMI)
-        // however the mutate function doesnt work with that
-        // lets turn it into a plain CBUMI string, mutate and turn back to CB_UMI
         let seq_cbumi = CbUmi::from_string(seq);
-        let seq_plain = format!("{}{}", seq_cbumi.cb, seq_cbumi.umi);  // turn into single string
-        let shadows_plain: Vec<String> = (0..28).flat_map(|pos| get_1bp_mutations(&seq_plain, pos)).collect();  // apply mutations at all positions
-        let shadows = shadows_plain.iter() // convert back to CbUmi
-            .map(|CBUMI| CbUmi{ 
-                cb: (&CBUMI[0..16]).to_string(), 
-                umi: (&CBUMI[16..28]).to_string()
-            });
-
-        for s in shadows{
+        let shadows = all_mutations_for_cbumi(seq_cbumi);
+        for (s, _mutated_pos) in shadows{
             candidates_and_shadows.insert( s, 0);
         }
     }
 
     // now go thorugh the fastqs again, recoding the TRUE frequencies of those items
-
     let file_iterators = fastq_list.into_iter()
         .map(|fname|{
             let decoder = bgzf::Reader::from_path(fname).unwrap();

@@ -9,7 +9,7 @@ mod utils;
 mod sketching;
 // use fastq::{parse_path, Record, Parser};
 // use std::env::args;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -24,13 +24,26 @@ struct Cli {
     // #[clap(parse(from_os_str), short = 'o', long= "whitelist")] 
     // whitelist: std::path::PathBuf,
     /// 10x CB whitelist
-    #[clap(short = 'o', long= "whitelist")] 
+    #[clap(short = 'w', long= "whitelist")] 
     whitelist: String,
+
+    #[clap(short = 'n', long= "ntop")] 
+    topn: usize,
 
     /// List of fastq files
     #[clap()]
-    fastq_list: Vec<String>
+    fastq_list: Vec<String>,
+
+    #[clap(short = 'c', long= "command")] 
+    command: String,
+    
 }
+
+// #[derive(Subcommand)]
+// enum Commands {
+//     cb,
+//     cbumi_sketch
+// }
 
 fn main() {
     // myfastq::run();
@@ -40,10 +53,24 @@ fn main() {
 
     println!("Whitelist {:?}",args.whitelist);
     println!("Output {:?}",args.output);
+    println!("Top N {:?}",args.topn);
     println!("FASTQ {:?}",args.fastq_list);
 
+    if args.command == "cb"{
+        println!("Doing CB only");
+        cb_errors::run(args.fastq_list, args.whitelist, "/tmp/full_out_cb.csv".to_string(), args.topn)
+    }
+    else if args.command == "cb_umi_sketch" {
+        println!("Doing CB_UMI sketch");
+        cb_umi_sketch::run_topN(&args.fastq_list, args.whitelist, args.output, args.topn)
+    }
+    else{
+        panic!("unknown command")
+    }
+    // cb_umi_sketch::run_topN(&args.fastq_list, args.whitelist, args.output, topn);
+    // cb_umi_errors::run(&args.fastq_list, args.whitelist, "/tmp/full_out.csv".to_string(), topn);
 
-    cb_umi_sketch::run_topN(&args.fastq_list, args.whitelist, args.output);
+
 
     // let args: Vec<String> = env::args().collect();
     // let fastq_list = &args[1..];
@@ -89,7 +116,6 @@ fn main() {
 
 
     if false{
-    // cb_errors::run(fastq_list, whitelist_file, "/tmp/out_cb.csv".to_string())
     // cb_umi_errors::run(fastq_list, whitelist_file, "/tmp/out_cb_umi.csv".to_string());
 
 

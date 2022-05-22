@@ -3,12 +3,11 @@ use std::io::BufReader;
 use std::io::BufRead;
 // use flate2::read::GzDecoder;
 use rust_htslib::bgzf;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
 use polars::prelude::{DataFrame, NamedFrom, Series};
-use crate::utils::{parse_whitelist_gz,parse_r1, get_1bp_mutations, write_to_csv};
-use crate::utils::CbUmi;
+use crate::utils::{parse_whitelist_gz,parse_r1_struct, write_to_csv, all_mutations_for_cbumi, CbUmi};
 
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<(String, String), u32> {
@@ -96,13 +95,15 @@ pub fn find_shadows(cb_umi: (String, String), filtered_map: &Counter<(String, St
     //
     let (cb_orig, umi_orig) = cb_umi;
 
-    let mut all_muts: Vec<(String, String, usize)>= Vec::new();  // cb, umi, pos
-    for pos in 0..umi_orig.len() {
-        for m in get_1bp_mutations(&umi_orig, pos){
-            let c2 = cb_orig.clone();
-            all_muts.push((c2, m, pos));
-        }
-    }
+    let all_muts = all_mutations_for_cbumi(cb_umi);
+
+    // let mut all_muts: Vec<(String, String, usize)>= Vec::new();  // cb, umi, pos
+    // for pos in 0..umi_orig.len() {
+    //     for m in get_1bp_mutations(&umi_orig, pos){
+    //         let c2 = cb_orig.clone();
+    //         all_muts.push((c2, m, pos));
+    //     }
+    // }
 
 
     let mut n_shadows_per_pos: HashMap<usize, u32> = HashMap::new();
@@ -133,7 +134,6 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     // parse whitelist
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
-
     
     let mut countmap = count_cb_filelist(fastq_list);
     // transform into shadow counter

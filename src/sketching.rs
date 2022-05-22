@@ -5,7 +5,6 @@ use std::collections::{HashSet, HashMap};
 use counter::Counter;
 use crate::utils::{parse_r1, set_comparison, write_to_csv};
 use polars::prelude::{DataFrame, NamedFrom, Series};
-use std::fs::File;
 use streaming_algorithms::{CountMinSketch, Top};
 
 

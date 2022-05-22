@@ -1,7 +1,7 @@
 use std::io::BufReader;
 use std::io::BufRead;
 use rust_htslib::bgzf;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashSet};
 use polars::prelude::{CsvWriter, DataFrame, SerWriter};
 use std::fs::File;
 
@@ -47,7 +47,7 @@ pub fn parse_r1_struct(seq: String) -> Option<CbUmi>{
     // }
 }
 
-#[derive(Hash, PartialEq, Eq)]
+#[derive(Hash, PartialEq, Eq, Clone)]
 pub struct CbUmi{
     pub cb: String,
     pub umi: String,
@@ -84,6 +84,41 @@ pub fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
     return muts
 }
 
+pub fn all_mutations_for_cbumi(cb_umi: CbUmi) -> Vec<(CbUmi, usize)>{
+    // we have to mutate both CB und UMI
+    // lets turn it into a plain CBUMI string, mutate and turn back to CB_UMI
+    let total_len = cb_umi.cb.len() + cb_umi.umi.len();
+
+    let seq_plain = format!("{}{}", cb_umi.cb, cb_umi.umi);  // turn into single string
+    // let shadows_plain: Vec<(String, usize)> = (0..total_len)
+    //     .flat_map(|pos| {
+    //         // add the mutated position into each mutation
+    //         get_1bp_mutations(&seq_plain, pos).into_iter().map(|mutation| (mutation, pos))
+    //     }
+    //     ).collect();  // apply mutations at all positions
+
+    let mut shadows_plain: Vec<(String, usize)> = Vec::new();
+    for pos in 0..total_len{
+        let mutations_at_pos = get_1bp_mutations(&seq_plain, pos).into_iter().map(|x| (x,pos));
+        for matp in mutations_at_pos{
+            shadows_plain.push(matp);
+        }
+    }
+
+    // this looks like [("AAA", 0), ("BAA", 0), ... ("AAB", 2)]
+    
+    // convert back to Cb Umi
+    let shadows = shadows_plain.iter() // convert back to CbUmi
+        .map(|(cbumi_str, pos)| {
+            let cbumi = CbUmi{ 
+                cb: (&cbumi_str[0..16]).to_string(), 
+                umi: (&cbumi_str[16..28]).to_string()
+            };
+            (cbumi, *pos)
+        }
+    ).collect();
+    shadows
+}
 
 use core::hash::Hash;
 pub fn set_comparison<T>(set_a: &HashSet<T>,set_b: &HashSet<T>)
