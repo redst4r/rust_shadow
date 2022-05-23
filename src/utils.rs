@@ -4,7 +4,27 @@ use rust_htslib::bgzf;
 use std::collections::{HashSet};
 use polars::prelude::{CsvWriter, DataFrame, SerWriter};
 use std::fs::File;
+use core::hash::Hash;
 
+pub fn fastq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
+    let file_iterators = fastq_list.into_iter()
+        .map(|fname|{
+            let decoder = bgzf::Reader::from_path(fname).unwrap();
+            let reader = BufReader::new(decoder);
+            let my_iter = reader.lines()
+                .enumerate().filter(|x| x.0 % 4 == 1)
+                .map(|x| x.1)
+                .filter_map(|line| line.ok()) //takes care of errors in file reading
+                .filter_map(|line| parse_r1_struct(line))
+                // .take(TOTAL_READS)
+                ;
+            my_iter
+        }
+        );
+    // chaining, flatmapping all the iterators into a single one
+    let my_iter = file_iterators.flat_map(|x| x);
+    my_iter
+}
 
 pub fn parse_whitelist_gz(fname: String) -> HashSet<String>{
     // loading 10x CB whilelist from file
@@ -120,7 +140,6 @@ pub fn all_mutations_for_cbumi(cb_umi: CbUmi) -> Vec<(CbUmi, usize)>{
     shadows
 }
 
-use core::hash::Hash;
 pub fn set_comparison<T>(set_a: &HashSet<T>,set_b: &HashSet<T>)
     where T: Eq + Hash
 {

@@ -12,19 +12,14 @@
 // 
 //
 use counter::Counter;
-use std::io::BufReader;
-use std::io::BufRead;
-use rust_htslib::bgzf;
 use std::collections::HashMap;
-use crate::utils::CbUmi;
-use crate::utils::{write_to_csv, parse_r1_struct, parse_whitelist_gz, all_mutations_for_cbumi};
+use crate::utils::{write_to_csv, parse_r1_struct, parse_whitelist_gz, all_mutations_for_cbumi, fastq_iter, CbUmi} ;
 use crate::sketching::GreaterThan1Bloom;
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use streaming_algorithms::Top;
 // use indicatif::ProgressIterator;
 // use indicatif::ProgressBar;
-
 
 const TOTAL_READS: usize = 50_000_000;
 
@@ -33,23 +28,7 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
-    let file_iterators = fastq_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1)
-                .filter_map(|line| line.ok()) //takes care of errors in file reading
-                .filter_map(|line| parse_r1_struct(line))
-                // .take(TOTAL_READS)
-                ;
-            my_iter
-        }
-        );
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
-    
+    let my_iter = fastq_iter(fastq_list);
     //--------------------------
     // first pass over data
     // keepign track of the topN elements in  the approximate counter
@@ -97,22 +76,8 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     }
 
     // now go thorugh the fastqs again, recoding the TRUE frequencies of those items
-    let file_iterators = fastq_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1)
-                .filter_map(|line| line.ok()) //takes care of errors in file reading
-                .filter_map(|line| parse_r1_struct(line))
-                // .take(TOTAL_READS)
-                ;
-            my_iter
-        }
-        );
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
+    let my_iter = fastq_iter(fastq_list);
+
     println!("Second pass");
 
     for (i, cbumi) in my_iter.enumerate(){
@@ -199,46 +164,24 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
 
 
 
-
-
-
-pub fn run_GB1(fastq_list: Vec<String>, whitelist_file: String, output_csv_file: String){
+pub fn run_GB1(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
     
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
+    let my_iter = fastq_iter(fastq_list);
 
-    let file_iterators = fastq_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1)
-                .filter_map(|line| line.ok()) //takes care of errors in file reading
-                .take(TOTAL_READS);
-
-            my_iter
-        }
-        );
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
-    
     // first pass over data, storing all elements #>1
     let tol = 1e-9;
     let prob = 1e-4;
     let mut GB1 :GreaterThan1Bloom<> = GreaterThan1Bloom::new(prob, tol);
 
-    for (i, line) in my_iter.enumerate(){
-        if let Some(cbumi) = parse_r1_struct(line){
-            let cm_umi_str = cbumi.to_string();
-            GB1.add_item(&cm_umi_str)
-        }
+    for (i, cbumi) in my_iter.enumerate(){
+        let cm_umi_str = cbumi.to_string();
+        GB1.add_item(&cm_umi_str);
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000);
             GB1.status();
         }        
     }
-
-
 }

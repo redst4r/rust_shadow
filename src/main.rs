@@ -58,7 +58,7 @@ fn main() {
 
     if args.command == "cb"{
         println!("Doing CB only");
-        cb_errors::run(args.fastq_list, args.whitelist, args.output, args.topn)
+        cb_errors::run(&args.fastq_list, args.whitelist, args.output, args.topn)
     }
     else if args.command == "cb_umi_sketch" {
         println!("Doing CB_UMI sketch");

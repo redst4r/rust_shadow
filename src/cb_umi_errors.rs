@@ -1,43 +1,23 @@
-use std::io::BufReader;
-use std::io::BufRead;
-use rust_htslib::bgzf;
 use std::collections::HashMap;
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
 use polars::prelude::{DataFrame, NamedFrom, Series};
-use crate::utils::{parse_whitelist_gz,parse_r1_struct, write_to_csv, all_mutations_for_cbumi, CbUmi};
-
+use crate::utils::{parse_whitelist_gz, write_to_csv, all_mutations_for_cbumi, CbUmi, fastq_iter};
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<CbUmi, u32> {
     // coutns the CB/UMI pairs in the fastq
 
     // reading the fastq.gz
-    // we chain all those files together into a single iterator
-    let file_iterators = fname_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1)
-                .filter_map(|line| line.ok()); //takes care of errors in file reading
-            my_iter
-        }
-        );
-
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
-
+    let my_iter = fastq_iter(fname_list);
 
     // parsing the lines, counting
     // let mut countermap: HashMap<CbUmi, i32> = HashMap::new();
     let mut countermap: Counter<CbUmi, u32> = Counter::new();
 
-    for (i, line) in my_iter.enumerate(){
-        if let Some(cbumi) = parse_r1_struct(line){
-            let counter = countermap.entry(cbumi).or_insert(0);
-            *counter += 1
-        }
+    for (i, cbumi) in my_iter.enumerate(){
+        let counter = countermap.entry(cbumi).or_insert(0);
+        *counter += 1;
+        
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000)
         }
