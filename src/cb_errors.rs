@@ -99,6 +99,17 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     let countmap = count_cb_filelist(fastq_list);
     println!("len of counter {}", countmap.len());
 
+    println!("saving counter to file /tmp/test.csv");
+    let mut cbs: Vec<String> = Vec::new();
+    let mut freqs: Vec<i32> = Vec::new();
+    for (k,v ) in countmap.iter(){
+        cbs.push(k.clone());
+        freqs.push(*v);
+    }
+    let df_cb = Series::new("CB", cbs);
+    let df_freq = Series::new("frequency", freqs);
+    let mut df_ = DataFrame::new(vec![df_cb, df_freq]).unwrap();
+    write_to_csv(&mut df_, "/tmp/test.csv".to_string());
 
     // now the hard part: group by CB, look at all UMIs therein
     println!("calculating most common");
