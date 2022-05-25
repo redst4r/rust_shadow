@@ -30,16 +30,19 @@ pub fn top_n(counter: &Counter<CbUmi, u32>, n: usize) -> Vec<CbUmi>{
     // gets the Top_n elements from the counter, making sure that
     // they are not shadows of other frequent elements
     let mut bk: BkTree<String> = BkTree::new(levenshtein_distance);
+    let mut top2: Vec<CbUmi> = Vec::new();
 
     let mut c = 0;
     for (cbumi, _freq) in counter.most_common(){
 
-        let cb_umi_str = cbumi.to_string();
-        let matches = bk.find(cb_umi_str, 1);
+        let matches = bk.find(cbumi.to_string(), 1);
         if matches.len() == 0{
-            let cb_umi_str =  cbumi.to_string();
-            bk.insert(cb_umi_str);
+            top2.push(cbumi.clone());  // add it to the topN list
+            bk.insert(cbumi.to_string());
             c += 1;
+        }
+        else{
+            bk.insert(cbumi.to_string());
         }
 
         if c >= n{
@@ -48,15 +51,6 @@ pub fn top_n(counter: &Counter<CbUmi, u32>, n: usize) -> Vec<CbUmi>{
         if c % 1_000 == 0{
             println!("Iteration {c} of {n}");
         }          
-    }
-
-    // for now, all the frequent CB/UMIs are the elements of the BKTree
-    // put them into a vector
-    let mut top2: Vec<CbUmi> = Vec::new();
-
-    for element in bk.into_iter(){
-        let cb_umi = CbUmi::from_string(&element);
-        top2.push(cb_umi);
     }
     top2
 }

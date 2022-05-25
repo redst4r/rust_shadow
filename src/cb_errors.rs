@@ -1,8 +1,8 @@
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
 use crate::utils::{get_1bp_mutations, parse_whitelist_gz, write_to_csv, fastq_iter};
-use polars::prelude::{CsvWriter, DataFrame, NamedFrom, SerWriter, Series};
+use polars::prelude::{DataFrame, NamedFrom, SerWriter, Series};
 
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<String, i32> {
@@ -31,16 +31,36 @@ pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
 
     // gets the Top_n elements from the counter, making sure that
     // they are not shadows of other frequent elements
+
+    // ======================================================================
+    // another problem: we only add to the BKTree if no related element is present
+    // However, consider three items A:1000,B:100,C:10 in descending frequency and
+    //  A-1->B-1->C  (A and B are one distance, B and C are one distance, A,C are two distance)
+    // - A gets added
+    // - we encounter B and skip it(since its a shadow of A, which is more frequent)
+    // - we encounter C (which is a shadow of B). Since B was never added to the BKTree
+    //   we would consider C a true molecule (even though a MORE FREQUENT seq within distance 1 exists!!)
+    // 
+    // Hence we really have to add the shadows to the BKTree itself.
+    // 
+    // This changes the criterion for the final list to:
+    // - any item A in this list DOES NOT have a 1-distance neigbour B that is more frequent than A
+
     let mut bk: BkTree<String> = BkTree::new(levenshtein_distance);
+    let mut top2: Vec<String> = Vec::new();
 
     let mut c = 0;
-
     for (cb, _freq) in counter.most_common(){
         let cb2 = cb.clone();  // TODO stupid cloing to be able to insert
         if bk.find(cb, 1).len() == 0{
             // let cb_umi = format!("{cb}_{umi}");
-            bk.insert(cb2);   // TODO stupid cloing to be able to insert
+            top2.push(cb2.clone());  // add it to the topN list
+            bk.insert(cb2);
             c += 1;
+        }
+        else{
+            bk.insert(cb2); // add it to the BKtree anyways, see function header for explain
+
         }
         if c >= n{
             break
@@ -49,14 +69,15 @@ pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
             println!("Iteration {c} of {n}");
         }          
     }
+    assert_eq!(top2.len(), n);
 
-    // for now, all the frequent CB/UMIs are the elements of the BKTree
-    // put them into a vector
-    let mut top2: Vec<String> = Vec::new();
+    // // for now, all the frequent CB/UMIs are the elements of the BKTree
+    // // put them into a vector
+    // let mut top2: Vec<String> = Vec::new();
 
-    for cb in bk.into_iter(){
-        top2.push(cb);
-    }
+    // for cb in bk.into_iter(){
+    //     top2.push(cb);
+    // }
     top2
 }
 
