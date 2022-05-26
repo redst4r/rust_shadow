@@ -7,8 +7,6 @@ mod cb_umi_sketch;
 mod cb_errors;
 mod utils;
 mod sketching;
-// use fastq::{parse_path, Record, Parser};
-// use std::env::args;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -39,16 +37,8 @@ struct Cli {
     
 }
 
-// #[derive(Subcommand)]
-// enum Commands {
-//     cb,
-//     cbumi_sketch
-// }
-
 fn main() {
-    // myfastq::run();
-    // sqlite::run();
-    // hset::run();
+
     let args = Cli::parse();
 
     println!("Whitelist {:?}",args.whitelist);
@@ -64,6 +54,11 @@ fn main() {
         println!("Doing CB_UMI sketch");
         cb_umi_sketch::run_topN(&args.fastq_list, args.whitelist, args.output, args.topn)
     }
+    else if args.command == "cb_umi_exact" {
+        println!("Doing CB_UMI sketch");
+        println!("WARNING: MEMORY INTENSIVE!!");
+        cb_umi_errors::run(&args.fastq_list, args.whitelist, args.output, args.topn)
+    }    
     else{
         panic!("unknown command")
     }
