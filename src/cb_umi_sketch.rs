@@ -13,15 +13,13 @@
 //
 use counter::Counter;
 use std::collections::HashMap;
-use crate::utils::{write_to_csv, parse_r1_struct, parse_whitelist_gz, all_mutations_for_cbumi, fastq_iter, CbUmi} ;
+use crate::utils::{write_to_csv, parse_whitelist_gz, all_mutations_for_cbumi, fastq_iter, CbUmi} ;
 use crate::sketching::GreaterThan1Bloom;
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use streaming_algorithms::Top;
 // use indicatif::ProgressIterator;
 // use indicatif::ProgressBar;
-
-const TOTAL_READS: usize = 50_000_000;
 
 
 pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
@@ -53,6 +51,24 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
     }
     // bar.finish();
 
+    // debugging: save the counter
+    println!("saving counter to file /tmp/test.csv");
+    let mut cbs: Vec<String> = Vec::new();
+    let mut umis: Vec<String> = Vec::new();
+    let mut freqs: Vec<u32> = Vec::new();
+    for (seq, _approx_freq) in ccc.iter(){
+        let s = CbUmi::from_string(seq);
+        cbs.push(s.cb.clone());
+        umis.push(s.umi.clone());
+        freqs.push(*_approx_freq);
+    }
+    let df_cb = Series::new("CB", cbs);
+    let df_umi = Series::new("UMI", umis);
+    let df_freq = Series::new("approx_frequency", freqs);
+    let mut df_ = DataFrame::new(vec![df_cb,df_umi, df_freq]).unwrap();
+    write_to_csv(&mut df_, "/tmp/approx_counter_cbumi.csv".to_string());
+
+
     println!("Done with first pass");
 
     // now we have a candidate list, all are valid CB accodinf to the whitelist
@@ -74,7 +90,7 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
             candidates_and_shadows.insert( s, 0);
         }
     }
-
+    
     // now go thorugh the fastqs again, recoding the TRUE frequencies of those items
     let my_iter = fastq_iter(fastq_list);
 
@@ -92,6 +108,24 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
         }               
     }
     println!("{}", candidates_and_shadows.len());
+
+    // debugging: save the counter
+    println!("saving counter to file /tmp/test.csv");
+    let mut cbs: Vec<String> = Vec::new();
+    let mut umis: Vec<String> = Vec::new();
+    let mut freqs: Vec<u32> = Vec::new();
+    for (k,v ) in candidates_and_shadows.iter(){
+        cbs.push(k.cb.clone());
+        umis.push(k.umi.clone());
+        freqs.push(*v);
+    }
+    let df_cb = Series::new("CB", cbs);
+    let df_umi = Series::new("UMI", umis);
+    let df_freq = Series::new("frequency", freqs);
+    let mut df_ = DataFrame::new(vec![df_cb,df_umi, df_freq]).unwrap();
+    write_to_csv(&mut df_, "/tmp/counter_cbumi.csv".to_string());
+
+
 
     // now we have all the actual counts!
     // identify the ACTUAL REAL reads () removing possible frequent shadows
