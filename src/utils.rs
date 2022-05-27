@@ -124,6 +124,7 @@ pub fn all_mutations_for_cbumi(cb_umi: CbUmi) -> Vec<(CbUmi, usize)>{
             shadows_plain.push(matp);
         }
     }
+    assert_eq!(shadows_plain.len(), total_len*3);
 
     // this looks like [("AAA", 0), ("BAA", 0), ... ("AAB", 2)]
     

@@ -11,7 +11,6 @@ pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<CbUmi, u32> {
     let my_iter = fastq_iter(fname_list);
 
     // parsing the lines, counting
-    // let mut countermap: HashMap<CbUmi, i32> = HashMap::new();
     let mut countermap: Counter<CbUmi, u32> = Counter::new();
 
     for (i, cbumi) in my_iter.enumerate(){
@@ -65,15 +64,6 @@ pub fn find_shadows(cb_umi: CbUmi, filtered_map: &Counter<CbUmi, u32>) -> HashMa
 
     let all_muts = all_mutations_for_cbumi(cb_umi);
 
-    // let mut all_muts: Vec<(String, String, usize)>= Vec::new();  // cb, umi, pos
-    // for pos in 0..umi_orig.len() {
-    //     for m in get_1bp_mutations(&umi_orig, pos){
-    //         let c2 = cb_orig.clone();
-    //         all_muts.push((c2, m, pos));
-    //     }
-    // }
-
-
     let mut n_shadows_per_pos: HashMap<usize, u32> = HashMap::new();
     for (cbumi, mutated_pos) in all_muts{
 
@@ -98,12 +88,12 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
     
-    let mut countmap = count_cb_filelist(fastq_list);
+    let countmap = count_cb_filelist(fastq_list);
     // transform into shadow counter
     println!("len of counter {}", countmap.len());
 
     // filter for whitelist only entries
-    println!("Filtering for whilelist");
+    // println!("Filtering for whilelist");
 
     // let mut keys_to_remove: Vec<CbUmi> = Vec::new();
     // for (cbumi, _count) in countmap.iter(){
@@ -116,7 +106,7 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     //     countmap.remove(&k);
     // }
 
-    println!("len of filtered counter {}", countmap.len());
+    // println!("len of filtered counter {}", countmap.len());
     // unstable:
     // countmap.drain_filter(|k, v| {
     //     k.0 == k.1
@@ -152,9 +142,9 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
 
     for mc in most_common{
 
-        if !whitelist.contains(&mc.cb){
-            continue
-        }
+        // if !whitelist.contains(&mc.cb){
+        //     continue
+        // }
 
         let mc2 = mc.clone();
         let nshadows_per_position = find_shadows(mc, &countmap);

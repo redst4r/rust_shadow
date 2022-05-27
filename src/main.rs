@@ -38,7 +38,10 @@ struct Cli {
 }
 
 fn main() {
-
+    // myfastq::run();
+    // sqlite::run();
+    // hset::run();
+    
     let args = Cli::parse();
 
     println!("Whitelist {:?}",args.whitelist);
