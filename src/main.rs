@@ -7,7 +7,7 @@ mod cb_umi_sketch;
 mod cb_errors;
 mod utils;
 mod sketching;
-use clap::{Parser, Subcommand};
+use clap::Parser;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]

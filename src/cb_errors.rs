@@ -159,7 +159,7 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
             polars_data.entry(format!("position_{position}")).or_insert(vec![]).push(*n_shadows)
         }
         let total_counts = countmap.get(&mc2).unwrap();
-        polars_data.entry("total".into()).or_insert(vec![]).push(*total_counts);
+        polars_data.entry("n_real".into()).or_insert(vec![]).push(*total_counts);
         cellnames.push(mc2)
     }
     
