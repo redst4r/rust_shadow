@@ -91,17 +91,23 @@ impl CbUmi {
 
 pub fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
     // return the three 1BP mutations of a sequence at the given position"
-    let mut muts = Vec::with_capacity(3);
-
-    for base in ['A', 'C', 'G', 'T']{
-        let prefix = &seq[0..pos];
-        let postfix = &seq[(pos+1)..];
-        let m = format!("{prefix}{base}{postfix}");
+    let mut mutation = Vec::with_capacity(3);
+    for base in ["A", "C", "G", "T"]{
+        let mut m = seq.clone();
+        m.replace_range(pos..(pos+1), base);
         if m != *seq{
-            muts.push(m);
+            mutation.push(m);
         }
     }
-    return muts
+    // for base in ['A', 'C', 'G', 'T']{
+        // let prefix = &seq[0..pos];
+        // let postfix = &seq[(pos+1)..];
+        // let m = format!("{prefix}{base}{postfix}");
+        // if m != *seq{
+        //     mutation.push(m);
+        // }
+    // }
+    return mutation
 }
 
 pub fn all_mutations_for_cbumi(cb_umi: CbUmi) -> Vec<(CbUmi, usize)>{

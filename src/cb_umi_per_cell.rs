@@ -106,12 +106,23 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
 }
 
 
+pub fn my_hamming(a: &String, b: &String) -> isize {
+
+    let mut counter: isize = 0;
+    for (c1, c2) in  std::iter::zip((*a).chars(), (*b).chars()){
+        if c1 != c2{
+            counter +=1 ;
+        }
+    };
+    counter
+}
+
 pub fn find_correct_umis(counter: &Counter<CbUmi, u32>) -> Vec<CbUmi>{
 
     // TODO we can probably speed this up. All the elements in Counter have the SAME CB!! not useful in the BKtree and just slows it down
     // starting with the most frequent UMIs, blacklist all UMIs 1BP away (by putting them into the BKtree)
     // keep itearting the UMIs util were done with all
-    let mut bk: BkTree<String> = BkTree::new(levenshtein_distance);
+    let mut bk: BkTree<String> = BkTree::new(my_hamming);
     let mut correct_umis: Vec<CbUmi> = Vec::new();
 
     let mut c = 0;
