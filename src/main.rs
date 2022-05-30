@@ -3,11 +3,13 @@
 // mod hset;
 mod cb_umi_errors;
 mod cb_umi_sketch;
-
 mod cb_errors;
 mod utils;
 mod sketching;
-use clap::Parser;
+
+use clap::{self, Parser, Subcommand, Args};
+mod bus;
+mod cb_umi_per_cell;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -19,22 +21,56 @@ struct Cli {
     #[clap(short ='o', long = "output")] 
     output: String,    
 
+    #[clap(subcommand)]
+    command: MyCommand
     // #[clap(parse(from_os_str), short = 'o', long= "whitelist")] 
     // whitelist: std::path::PathBuf,
+    // 10x CB whitelist
+    // #[clap(short = 'w', long= "whitelist")] 
+    // whitelist: String,
+
+    // #[clap(short = 'n', long= "ntop")] 
+    // topn: usize,
+
+    // List of fastq files
+    // #[clap()]
+    // fastq_list: Vec<String>,
+
+    // #[clap(short = 'c', long= "command")] 
+    // command: String,
+    
+}
+
+#[derive(Subcommand)]
+enum MyCommand {
+    cb(FastqArgs),
+    cb_umi_exact(FastqArgs),
+    cb_umi_sketch(FastqArgs),
+    cb_umi_cell(BusArgs)
+}
+
+#[derive(Args)]
+struct FastqArgs{
     /// 10x CB whitelist
     #[clap(short = 'w', long= "whitelist")] 
     whitelist: String,
 
+    /// topN CM/UMI to consider
     #[clap(short = 'n', long= "ntop")] 
     topn: usize,
 
     /// List of fastq files
     #[clap()]
     fastq_list: Vec<String>,
+}
 
-    #[clap(short = 'c', long= "command")] 
-    command: String,
+#[derive(Args)]
+struct BusArgs{
+    #[clap()]
+    busfile: String,
     
+    #[clap(short = 'n', long= "nmax")] 
+    nmax: usize
 }
 
 fn main() {
@@ -42,31 +78,59 @@ fn main() {
     // sqlite::run();
     // hset::run();
     
-    let args = Cli::parse();
+    let cli = Cli::parse();
 
-    println!("Whitelist {:?}",args.whitelist);
-    println!("Output {:?}",args.output);
-    println!("Top N {:?}",args.topn);
-    println!("FASTQ {:?}",args.fastq_list);
+    match cli.command{
+        MyCommand::cb(args) => {
+            println!("Doing CB only");
+            cb_errors::run(&args.fastq_list, args.whitelist, cli.output, args.topn)           
+        },
+        MyCommand::cb_umi_exact(args) => {
+            println!("Doing CB_UMI sketch");
+            println!("WARNING: MEMORY INTENSIVE!!");
+            cb_umi_errors::run(&args.fastq_list, args.whitelist, cli.output, args.topn)
+        },
+        MyCommand::cb_umi_sketch(args) => {
+            println!("Doing CB_UMI sketch");
+            cb_umi_sketch::run_topN(&args.fastq_list, args.whitelist, cli.output, args.topn)
+            
+        },
+        MyCommand::cb_umi_cell(args) => {
+            println!("Doing CB_UMI via single cells");
+            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax)  
+        },
+        _ => panic!("gg"),
 
-    if args.command == "cb"{
-        println!("Doing CB only");
-        cb_errors::run(&args.fastq_list, args.whitelist, args.output, args.topn)
-    }
-    else if args.command == "cb_umi_sketch" {
-        println!("Doing CB_UMI sketch");
-        cb_umi_sketch::run_topN(&args.fastq_list, args.whitelist, args.output, args.topn)
-    }
-    else if args.command == "cb_umi_exact" {
-        println!("Doing CB_UMI sketch");
-        println!("WARNING: MEMORY INTENSIVE!!");
-        cb_umi_errors::run(&args.fastq_list, args.whitelist, args.output, args.topn)
-    }    
-    else{
-        panic!("unknown command")
-    }
-    // cb_umi_sketch::run_topN(&args.fastq_list, args.whitelist, args.output, topn);
-    // cb_umi_errors::run(&args.fastq_list, args.whitelist, "/tmp/full_out.csv".to_string(), topn);
+    };
+
+
+    // println!("Whitelist {:?}",cli.whitelist);
+    // println!("Output {:?}",cli.output);
+    // println!("Top N {:?}",cli.topn);
+    // println!("FASTQ {:?}",cli.fastq_list);
+
+    // if cli.command == "cb"{
+    //     println!("Doing CB only");
+    //     cb_errors::run(&cli.fastq_list, cli.whitelist, cli.output, cli.topn)
+    // }
+    // else if cli.command == "cb_umi_sketch" {
+    //     println!("Doing CB_UMI sketch");
+    //     cb_umi_sketch::run_topN(&cli.fastq_list, cli.whitelist, cli.output, cli.topn)
+    // }
+    // else if cli.command == "cb_umi_exact" {
+    //     println!("Doing CB_UMI sketch");
+    //     println!("WARNING: MEMORY INTENSIVE!!");
+    //     cb_umi_errors::run(&cli.fastq_list, cli.whitelist, cli.output, cli.topn)
+    // }   
+    // else if cli.command == "cb_umi_singlecell" {
+    //     println!("Doing CB_UMI via single cells");
+    //     cb_umi_per_cell::run(&"/home/michi/output.corrected.sort.bus".to_string())
+    // }   
+    // else{
+    //     panic!("unknown command")
+    // }
+    // cb_umi_sketch::run_topN(&cli.fastq_list, cli.whitelist, cli.output, topn);
+    // cb_umi_errors::run(&cli.fastq_list, cli.whitelist, "/tmp/full_out.csv".to_string(), topn);
 
 
 
@@ -88,41 +152,6 @@ fn main() {
 
 
     // let whitelist_file: String = "/home/mstrasse/TB4/resources/3M-february-2018.txt.gz".into();
-    // let fastq_file1: String = "/home/mstrasse/TB4/tmp/fastq_tmp/L05Ai/bamtofastq_S1_L000_R1_001.fastq.gz".into();
-    // let fastq_file2: String = "/home/mstrasse/TB4/tmp/fastq_tmp/L05Ai/bamtofastq_S1_L000_R1_002.fastq.gz".into();
-    // let fastq_file3: String = "/home/mstrasse/TB4/tmp/fastq_tmp/L05Ai/bamtofastq_S1_L000_R1_003.fastq.gz".into();
-    // let fastq_file4: String = "/home/mstrasse/TB4/tmp/fastq_tmp/L05Ai/bamtofastq_S1_L000_R1_004.fastq.gz".into();
-    // let fastq_file5: String = "/home/mstrasse/TB4/tmp/fastq_tmp/L05Ai/bamtofastq_S1_L000_R1_005.fastq.gz".into();
-    // let fastq_file6: String = "/home/mstrasse/TB4/tmp/fastq_tmp/L05Ai/bamtofastq_S1_L000_R1_006.fastq.gz".into();
-    // let fastq_file7: String = "/home/mstrasse/TB4/tmp/fastq_tmp/L05Ai/bamtofastq_S1_L000_R1_007.fastq.gz".into();
-    // let fastq_file8: String = "/home/mstrasse/TB4/tmp/fastq_tmp/L05Ai/bamtofastq_S1_L000_R1_008.fastq.gz".into();
-    // let fastq_list = vec![fastq_file1, fastq_file2, fastq_file3, fastq_file4, fastq_file5, fastq_file6, fastq_file7, fastq_file8] ;
-
-
-    // sketching::run(fastq_list);
-    // sketching::run_top(fastq_list);
-    // sketching::run_gt1(fastq_list);
-    // cb_umi_sketch::run_GB1(fastq_list, whitelist_file, "/tmp/out.csv".to_string());
-
-
-    // use indicatif::ProgressBar;
-    // let bar = ProgressBar::new_spinner();
-    // for i in 0..100{
-    //     bar.inc(1);
-    // }
-    // bar.finish();
-
-    // cb_umi_sketch::run_topN(&fastq_list, whitelist_file, "/tmp/out.csv".to_string());
-    // cb_umi_errors::run(&fastq_list, whitelist_file, "/tmp/full_out.csv".to_string());
-
-
-    if false{
-    // cb_umi_errors::run(fastq_list, whitelist_file, "/tmp/out_cb_umi.csv".to_string());
-
-
-    // cb_errors::run(fastq_file, whitelist_file, "/tmp/out_cb.csv".to_string())
-
-    }
 }
 
 
