@@ -40,18 +40,18 @@ pub fn parse_whitelist_gz(fname: String) -> HashSet<String>{
     hset
 }
 
-pub fn parse_r1(seq: String) -> Option<(String, String)>{
-    // TODO: size check
-    // if seq.len() == 16 + 12{
-        let cb = (&seq[0..16]).into();
-        let umi = (&seq[16..28]).into();
-        Some((cb, umi))
-    // }
-    // else
-    // {
-        // None
-    // }
-}
+// pub fn parse_r1(seq: String) -> Option<(String, String)>{
+//     // TODO: size check
+//     // if seq.len() == 16 + 12{
+//         let cb = (&seq[0..16]).into();
+//         let umi = (&seq[16..28]).into();
+//         Some((cb, umi))
+//     // }
+//     // else
+//     // {
+//         // None
+//     // }
+// }
 
 
 pub fn parse_r1_struct(seq: String) -> Option<CbUmi>{
