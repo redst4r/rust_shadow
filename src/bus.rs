@@ -5,7 +5,6 @@ use std::io::BufReader;
 use std::io::Write;
 use serde::{Serialize, Deserialize};
 use std::io::{Seek, SeekFrom};
-
 use bincode;
 
 
@@ -17,6 +16,7 @@ const BUS_HEADER_SIZE: usize = 20;
 // Q: 8byte unsigned long,long int
 // i: 4byte int
 // I: unsigned int, 4byte
+#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct BusRecord {
     pub CB: u64, //8byte
@@ -55,30 +55,30 @@ impl BusHeader {
 }
 
 
-fn read_bus_records(fname: &str) -> Vec<BusRecord>{
+// fn read_bus_records(fname: &str) -> Vec<BusRecord>{
 
-    let mut file = std::fs::File::open(fname).expect("FAIL");
+//     let mut file = std::fs::File::open(fname).expect("FAIL");
 
-    let header = BusHeader::from_file(&fname.into());
-    // move the cursor across the header to the first entry
-    let to_seek:u64 = BUS_HEADER_SIZE.try_into().unwrap();
-    let hhh: u64 = header.tlen.into();
-    let _x = file.seek(SeekFrom::Start(to_seek + hhh)).unwrap();
+//     let header = BusHeader::from_file(&fname.into());
+//     // move the cursor across the header to the first entry
+//     let to_seek:u64 = BUS_HEADER_SIZE.try_into().unwrap();
+//     let hhh: u64 = header.tlen.into();
+//     let _x = file.seek(SeekFrom::Start(to_seek + hhh)).unwrap();
 
 
-    let mut buf = BufReader::new(file);
-    let mut records: Vec<BusRecord> = Vec::new();
-    let mut record_bytes = [0; BUS_ENTRY_SIZE];
-    loop {
-        match buf.read(&mut record_bytes) {
-            Ok(0) => break,
-            Ok(BUS_ENTRY_SIZE) => records.push(bincode::deserialize(&record_bytes).unwrap()),
-            Ok(n) => panic!("{:?}", n),
-            Err(e) => panic!("{:?}", e),
-        };
-    }
-    records
-}
+//     let mut buf = BufReader::new(file);
+//     let mut records: Vec<BusRecord> = Vec::new();
+//     let mut record_bytes = [0; BUS_ENTRY_SIZE];
+//     loop {
+//         match buf.read(&mut record_bytes) {
+//             Ok(0) => break,
+//             Ok(BUS_ENTRY_SIZE) => records.push(bincode::deserialize(&record_bytes).unwrap()),
+//             Ok(n) => panic!("{:?}", n),
+//             Err(e) => panic!("{:?}", e),
+//         };
+//     }
+//     records
+// }
 
 pub struct BusWriter{
     pub buf: BufWriter<File>,
@@ -87,7 +87,7 @@ pub struct BusWriter{
 impl BusWriter {
     pub fn new(filename: &String, header: BusHeader) -> BusWriter{
         // let mut file_handle = std::fs::File::open(filename).expect("FAILED to open");
-        let mut file_handle: File = File::create(filename).expect("FAILED to open");
+        let file_handle: File = File::create(filename).expect("FAILED to open");
 
         let mut buf = BufWriter::new(file_handle);
 
@@ -235,7 +235,7 @@ mod tests {
         let busname = "/tmp/test.bus".to_string();
         let mut writer = BusWriter::new(&busname, header);
         writer.write_record(&r1);
-        writer.buf.flush();
+        writer.buf.flush().unwrap();
 
         let bheader = BusHeader::from_file(&busname);
         let header = BusHeader::new(16, 12, 20);
@@ -257,13 +257,14 @@ mod tests {
         writer.buf.flush().unwrap();
 
         let mut reader = BusIteratorBuffered::new(&busname);
-        // let records: Vec<BusRecord> = reader.into_iter().collect();
         let e1 = reader.next().unwrap();
         assert_eq!(e1, r1);
         println!("{:?} {:?}", r1, e1);
 
         let e2 = reader.next().unwrap();
+        assert_eq!(e2, r2);
 
+        // let records: Vec<BusRecord> = reader.into_iter().collect();
         // assert_eq!(records, vec![r1, r2])
 
     }

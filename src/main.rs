@@ -13,34 +13,16 @@ mod cb_umi_per_cell;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
-struct Cli {
-
-    // #[clap(parse(from_os_str), short ='o', long = "output")] 
-    // output: std::path::PathBuf,    
+struct Cli {  
     /// Path to output file
     #[clap(short ='o', long = "output")] 
     output: String,    
 
     #[clap(subcommand)]
     command: MyCommand
-    // #[clap(parse(from_os_str), short = 'o', long= "whitelist")] 
-    // whitelist: std::path::PathBuf,
-    // 10x CB whitelist
-    // #[clap(short = 'w', long= "whitelist")] 
-    // whitelist: String,
-
-    // #[clap(short = 'n', long= "ntop")] 
-    // topn: usize,
-
-    // List of fastq files
-    // #[clap()]
-    // fastq_list: Vec<String>,
-
-    // #[clap(short = 'c', long= "command")] 
-    // command: String,
-    
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Subcommand)]
 enum MyCommand {
     cb(FastqArgs),
@@ -66,9 +48,11 @@ struct FastqArgs{
 
 #[derive(Args)]
 struct BusArgs{
+    /// Busfile to read the CB/UMIs from
     #[clap()]
     busfile: String,
     
+    /// Max #entries to consider in the bus file
     #[clap(short = 'n', long= "nmax")] 
     nmax: usize
 }
@@ -98,9 +82,7 @@ fn main() {
         MyCommand::cb_umi_cell(args) => {
             println!("Doing CB_UMI via single cells");
             cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax)  
-        },
-        _ => panic!("gg"),
-
+        }
     };
 
 
@@ -109,26 +91,6 @@ fn main() {
     // println!("Top N {:?}",cli.topn);
     // println!("FASTQ {:?}",cli.fastq_list);
 
-    // if cli.command == "cb"{
-    //     println!("Doing CB only");
-    //     cb_errors::run(&cli.fastq_list, cli.whitelist, cli.output, cli.topn)
-    // }
-    // else if cli.command == "cb_umi_sketch" {
-    //     println!("Doing CB_UMI sketch");
-    //     cb_umi_sketch::run_topN(&cli.fastq_list, cli.whitelist, cli.output, cli.topn)
-    // }
-    // else if cli.command == "cb_umi_exact" {
-    //     println!("Doing CB_UMI sketch");
-    //     println!("WARNING: MEMORY INTENSIVE!!");
-    //     cb_umi_errors::run(&cli.fastq_list, cli.whitelist, cli.output, cli.topn)
-    // }   
-    // else if cli.command == "cb_umi_singlecell" {
-    //     println!("Doing CB_UMI via single cells");
-    //     cb_umi_per_cell::run(&"/home/michi/output.corrected.sort.bus".to_string())
-    // }   
-    // else{
-    //     panic!("unknown command")
-    // }
     // cb_umi_sketch::run_topN(&cli.fastq_list, cli.whitelist, cli.output, topn);
     // cb_umi_errors::run(&cli.fastq_list, cli.whitelist, "/tmp/full_out.csv".to_string(), topn);
 

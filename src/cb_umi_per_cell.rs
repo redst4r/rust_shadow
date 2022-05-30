@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use bktree::{BkTree, levenshtein_distance};
-
 use crate::bus::{CellIterator, BusRecord};
 use crate::utils::{int_to_seq, CbUmi, write_to_csv};
 use counter::Counter;
-
 use crate::cb_umi_errors::{find_shadows};
-use polars::prelude::{DataFrame, NamedFrom, Series};
-use indicatif::ProgressBar;
+use polars::prelude::*;
+
+// use indicatif::ProgressBar;
 
 #[cfg(test)]
 #[test]
@@ -16,26 +15,16 @@ fn main(){
 }
 
 
-    // for i in 0..100{
-    //     bar.inc(1);
-    // }
-    // bar.finish();
-
 pub fn run(busfile: &String, outfile: &String, nmax: usize){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
     let cb_iter = CellIterator::new(&busfile);
 
-    // let mut df_list: Vec<DataFrame> = Vec::new();
     let mut df = DataFrame::default();
     // let bar = ProgressBar::new();
 
     for (i, records) in cb_iter.map(|(_cb, rec)| rec).enumerate(){
         // println!("Doing cell with #{} records", records.len());
         let df_single_cell = do_single_cb(records);
-        // if df_single_cell.height() > 1000{
-        //     println!("Writing onto file");
-        //     write_to_csv(&mut df_single_cell, "/tmp/cb.csv".to_string());
-        // }
         if df.is_empty(){
             df = df_single_cell;
         }
@@ -43,18 +32,20 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize){
             df = df.vstack(&df_single_cell).unwrap();
         }
         if i % 100 == 0{
-            println!("Iteration {} Mio", i/100);
+            println!("Iteration {}", i);
             println!("current height {}", df.height());
 
         }
         if df.height() > nmax{
             break
         }
-        // df_list.push(df_single_cell);
     }
     println!("final height{}", df.height());
 
     write_to_csv(&mut df, outfile.to_string());
+
+    // let fh = File::create("example.parquet").expect("could not create file");
+    // ParquetWriter::new(fh).finish(&mut df);
 
     write_to_csv(&mut df.sum(), "/tmp/cb_sum.csv".to_string());
 

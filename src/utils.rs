@@ -110,12 +110,6 @@ pub fn all_mutations_for_cbumi(cb_umi: CbUmi) -> Vec<(CbUmi, usize)>{
     let total_len = cb_umi.cb.len() + cb_umi.umi.len();
 
     let seq_plain = format!("{}{}", cb_umi.cb, cb_umi.umi);  // turn into single string
-    // let shadows_plain: Vec<(String, usize)> = (0..total_len)
-    //     .flat_map(|pos| {
-    //         // add the mutated position into each mutation
-    //         get_1bp_mutations(&seq_plain, pos).into_iter().map(|mutation| (mutation, pos))
-    //     }
-    //     ).collect();  // apply mutations at all positions
 
     let mut shadows_plain: Vec<(String, usize)> = Vec::new();
     for pos in 0..total_len{
@@ -231,7 +225,25 @@ mod tests {
     use crate::utils::*;
 
     #[test]
-    fn encode_decode_seq(){
+    fn test_get_1bp_mutations(){
+        assert_eq!(get_1bp_mutations(&"AAAA".to_string(), 2), vec!["AACA".to_string(), "AAGA".to_string(), "AATA".to_string()]);
+        assert_eq!(get_1bp_mutations(&"TTTT".to_string(), 1), vec!["TATT".to_string(), "TCTT".to_string(), "TGTT".to_string()]);
+
+
+    }
+    #[test]
+    fn encode_seq(){
+        assert_eq!(seq_to_int("A".to_string()), 0);
+        assert_eq!(seq_to_int("C".to_string()), 1);
+        assert_eq!(seq_to_int("G".to_string()), 2);
+        assert_eq!(seq_to_int("T".to_string()), 3);
+
+        assert_eq!(seq_to_int("GCCA".to_string()), 148);
+
+    }
+
+    #[test]
+    fn decode_seq(){
         let x = vec![0,1,2,3,4,5,6,7,8];
         for i in x{
             println!("DECDODED {}:{:?}", i, int_to_seq(i, 5));

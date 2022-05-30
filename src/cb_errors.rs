@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use counter::Counter;
 use bktree::{BkTree, levenshtein_distance};
 use crate::utils::{get_1bp_mutations, parse_whitelist_gz, write_to_csv, fastq_iter};
-use polars::prelude::{DataFrame, NamedFrom, SerWriter, Series};
+use polars::prelude::{DataFrame, NamedFrom, Series};
 
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<String, i32> {

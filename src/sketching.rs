@@ -1,9 +1,6 @@
-use std::io::BufReader;
-use std::io::BufRead;
-use rust_htslib::bgzf;
 use std::collections::{HashSet, HashMap};
 use counter::Counter;
-use crate::utils::{parse_r1, set_comparison, write_to_csv};
+use crate::utils::{set_comparison, write_to_csv, fastq_iter} ;
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use streaming_algorithms::{CountMinSketch, Top};
 
@@ -22,20 +19,7 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
 
 
     // reading the fastq.gz
-    // we chain all those files together into a single iterator
-    let file_iterators = fname_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1);
-            my_iter
-        }
-        );
-
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
+    let my_iter = fastq_iter(&fname_list);
 
 
     // use CountMinSketch for approximate freqs
@@ -44,13 +28,10 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
     // parsing the lines, counting
     let mut countermap: Counter<String, i32> = Counter::new();
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some((cb, _umi)) = parse_r1(line){
-                let counter = countermap.entry(cb).or_insert(0);
-                *counter += 1
-            }
-        }
+    for (i, cbumi) in my_iter.enumerate(){
+        let counter = countermap.entry(cbumi.cb).or_insert(0);
+        *counter += 1;
+
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000)
         }
@@ -61,22 +42,7 @@ pub fn count_cb_filelist(fname_list: Vec<String>) -> Counter<String, i32> {
 pub fn run_top(fastq_list: Vec<String>){
 
     // determinig the topN barcodes in the fastqs
-
-    let file_iterators = fastq_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1)
-                .filter_map(|line| line.ok()); //takes care of errors in file reading
-                
-            my_iter
-        }
-        );
-
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
+    let my_iter = fastq_iter(&fastq_list);
 
     let TOPN = 10000; 
     let tolerance = 1e-8;
@@ -86,17 +52,16 @@ pub fn run_top(fastq_list: Vec<String>){
     let mut ccc:Top<String, u32> = Top::new(TOPN, probability, tolerance, {});
     let mut countermap: Counter<String, u32> = Counter::new();
 
-    for (i, line) in my_iter.enumerate(){
-        if let Some((cb, _umi)) = parse_r1(line){
-            let cb_umi = format!("{cb}_{_umi}");
-            let cb_umi2 = format!("{cb}_{_umi}");
+    for (i, cbumi) in my_iter.enumerate(){
+        let cb_umi = cbumi.to_string();
+        let cb_umi2 = cbumi.to_string();
 
-            // let cb2 = cb.clone();
-            let counter = countermap.entry(cb_umi).or_insert(0);
-            *counter += 1;
+        // let cb2 = cb.clone();
+        let counter = countermap.entry(cb_umi).or_insert(0);
+        *counter += 1;
 
-            ccc.push(cb_umi2, &1);
-        }
+        ccc.push(cb_umi2, &1);
+
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000)
         }        
@@ -191,20 +156,7 @@ impl GreaterThan1Bloom {
 pub fn run_gt1(fastq_list: Vec<String>){
 
     // get all CB_UMI that occur more than once
-
-    let file_iterators = fastq_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1);
-            my_iter
-        }
-        );
-
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
+    let my_iter = fastq_iter(&fastq_list);
 
     let tolerance = 1e-8;
     let probability = 0.00001;
@@ -222,19 +174,14 @@ pub fn run_gt1(fastq_list: Vec<String>){
 
     let mut countermap: Counter<String, u32> = Counter::new();
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some((cb, _umi)) = parse_r1(line){
+    for (i, cbumi) in my_iter.enumerate(){
+        let cb_umi = cbumi.to_string();
+        let cb_umi2 = cbumi.to_string();
 
-                let cb_umi = format!("{cb}_{_umi}");
-                let cb_umi2 = format!("{cb}_{_umi}");
+        let counter = countermap.entry(cb_umi).or_insert(0);
+        *counter += 1;
 
-                let counter = countermap.entry(cb_umi).or_insert(0);
-                *counter += 1;
-
-                GE.add_item(&cb_umi2);
-            }
-        }
+        GE.add_item(&cb_umi2);
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000)
         }        
@@ -269,36 +216,17 @@ pub fn run(fastq_list: Vec<String>){
 
     // let fastq_file1: String = "/home/michi/mounts/TB4drive/ISB_data/LT_pilot/LT_pilot/raw_data/Fresh1/Fresh1_CKDL210025651-1a-SI_TT_C2_HVWMHDSX2_S2_L001_R1_001.fastq.gz".into();
     // let fastq_list = vec![fastq_file1] ;
-
-    let file_iterators = fastq_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1);
-            my_iter
-        }
-        );
-
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
-
-
+    let my_iter = fastq_iter(&fastq_list);
 
     let mut ccc:CountMinSketch<String, u32> = CountMinSketch::new(0.0001, 1e-9, {});
     let mut countermap: Counter<String, u32> = Counter::new();
 
-    for (i, l) in my_iter.enumerate(){
-        if let Ok(line) = l{
-            if let Some((cb, _umi)) = parse_r1(line){
-                let cb2 = cb.clone();
-                let counter = countermap.entry(cb).or_insert(0);
-                *counter += 1;
+    for (i, cbumi) in my_iter.enumerate(){
+        let cb2 = cbumi.cb.clone();
+        let counter = countermap.entry(cbumi.cb).or_insert(0);
+        *counter += 1;
 
-                ccc.push(&cb2, &1);
-            }
-        }
+        ccc.push(&cb2, &1);
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000)
         }        
