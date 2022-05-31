@@ -224,12 +224,30 @@ pub fn int_to_seq(i: u64, seq_len:u64) -> String{
 }   
 
 
+pub fn my_hamming(a: &String, b: &String) -> isize {
+    // hamming distance for two strings of the same size
+    assert_eq!(a.len(), b.len());
+    let mut counter: isize = 0;
+    for (c1, c2) in  std::iter::zip((*a).chars(), (*b).chars()){
+        if c1 != c2{
+            counter +=1 ;
+        }
+    };
+    counter
+}
+
 #[cfg(test)]
 mod tests {
     // use std::io::W/rite;
     // use crate::bus::{BusRecord, BusHeader, CellIterator, BusIteratorBuffered, BusWriter};
     use crate::utils::*;
 
+    #[test]
+    fn test_my_hamming(){
+        assert_eq!(my_hamming(&("AAAA".to_string()), &("AAAT".to_string())), 1);
+        assert_eq!(my_hamming(&("AAAA".to_string()), &("TTTT".to_string())), 4);
+
+    }
     #[test]
     fn test_get_1bp_mutations(){
         assert_eq!(get_1bp_mutations(&"AAAA".to_string(), 2), vec!["AACA".to_string(), "AAGA".to_string(), "AATA".to_string()]);
@@ -251,9 +269,9 @@ mod tests {
     #[test]
     fn decode_seq(){
         let x = vec![0,1,2,3,4,5,6,7,8];
-        for i in x{
-            println!("DECDODED {}:{:?}", i, int_to_seq(i, 5));
-        }
+        // for i in x{
+        //     println!("DECDODED {}:{:?}", i, int_to_seq(i, 5));
+        // }
 
 
         //  base order

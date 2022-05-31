@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use counter::Counter;
-use bktree::{BkTree, levenshtein_distance};
-use crate::utils::{get_1bp_mutations, parse_whitelist_gz, write_to_csv, fastq_iter};
+use bktree::BkTree;
+use crate::utils::{get_1bp_mutations, parse_whitelist_gz, write_to_csv, fastq_iter, my_hamming};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 
 
@@ -46,7 +46,7 @@ pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
     // This changes the criterion for the final list to:
     // - any item A in this list DOES NOT have a 1-distance neigbour B that is more frequent than A
 
-    let mut bk: BkTree<String> = BkTree::new(levenshtein_distance);
+    let mut bk: BkTree<String> = BkTree::new(my_hamming);
     let mut top2: Vec<String> = Vec::new();
 
     let mut c = 0;

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use counter::Counter;
-use bktree::{BkTree, levenshtein_distance};
+use bktree::BkTree;
 use polars::prelude::{DataFrame, NamedFrom, Series};
-use crate::utils::{parse_whitelist_gz, write_to_csv, all_mutations_for_cbumi, CbUmi, fastq_iter};
+use crate::utils::{parse_whitelist_gz, write_to_csv, all_mutations_for_cbumi, CbUmi, fastq_iter, my_hamming};
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<CbUmi, u32> {
     // coutns the CB/UMI pairs in the fastq
@@ -28,7 +28,7 @@ pub fn top_n(counter: &Counter<CbUmi, u32>, n: usize) -> Vec<CbUmi>{
 
     // gets the Top_n elements from the counter, making sure that
     // they are not shadows of other frequent elements
-    let mut bk: BkTree<String> = BkTree::new(levenshtein_distance);
+    let mut bk: BkTree<String> = BkTree::new(my_hamming);
     let mut top2: Vec<CbUmi> = Vec::new();
 
     let mut c = 0;

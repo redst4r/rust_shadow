@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use bktree::{BkTree, levenshtein_distance};
+use bktree::BkTree;
 use crate::bus::{CellIterator, BusRecord};
-use crate::utils::{int_to_seq, CbUmi, write_to_csv};
+use crate::utils::{int_to_seq, CbUmi, write_to_csv, my_hamming};
 use counter::Counter;
 use crate::cb_umi_errors::{find_shadows};
 use polars::prelude::*;
@@ -106,16 +106,7 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
 }
 
 
-pub fn my_hamming(a: &String, b: &String) -> isize {
 
-    let mut counter: isize = 0;
-    for (c1, c2) in  std::iter::zip((*a).chars(), (*b).chars()){
-        if c1 != c2{
-            counter +=1 ;
-        }
-    };
-    counter
-}
 
 pub fn find_correct_umis(counter: &Counter<CbUmi, u32>) -> Vec<CbUmi>{
 
