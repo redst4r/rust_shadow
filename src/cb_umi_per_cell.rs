@@ -22,7 +22,7 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize){
     let mut df = DataFrame::default();
     let bar = ProgressBar::new(nmax as u64);
 
-    for (i, records) in cb_iter.map(|(_cb, rec)| rec).enumerate(){
+    for (i, records) in cb_iter.map(|(_cb, rec)| rec).filter(|rec| rec.len()>100).enumerate(){
         // println!("Doing cell with #{} records", records.len());
         let df_single_cell = do_single_cb(records);
         if df.is_empty(){
