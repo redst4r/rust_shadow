@@ -6,7 +6,7 @@ use counter::Counter;
 use crate::cb_umi_errors::{find_shadows};
 use polars::prelude::*;
 
-// use indicatif::ProgressBar;
+use indicatif::ProgressBar;
 
 #[cfg(test)]
 #[test]
@@ -20,25 +20,28 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize){
     let cb_iter = CellIterator::new(&busfile);
 
     let mut df = DataFrame::default();
-    // let bar = ProgressBar::new();
+    let bar = ProgressBar::new(nmax as u64);
 
     for (i, records) in cb_iter.map(|(_cb, rec)| rec).enumerate(){
         // println!("Doing cell with #{} records", records.len());
         let df_single_cell = do_single_cb(records);
         if df.is_empty(){
             df = df_single_cell;
+            bar.inc(df.height() as u64);
         }
         else{
             df = df.vstack(&df_single_cell).unwrap();
+            bar.inc(df_single_cell.height() as u64);
         }
-        if i % 100 == 0{
-            println!("Iteration {}", i);
-            println!("current height {}", df.height());
-
-        }
+        // if i % 100 == 0{
+        //     println!("Iteration/Cell {}", i);
+        //     println!("current height {}", df.height());
+        // }
         if df.height() > nmax{
+            bar.finish();
             break
         }
+
     }
     println!("final height{}", df.height());
 
