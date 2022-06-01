@@ -117,7 +117,7 @@ pub fn all_mutations_for_cbumi(cb_umi: CbUmi) -> Vec<(CbUmi, usize)>{
 
     let seq_plain = format!("{}{}", cb_umi.cb, cb_umi.umi);  // turn into single string
 
-    let mut shadows_plain: Vec<(String, usize)> = Vec::new();
+    let mut shadows_plain: Vec<(String, usize)> = Vec::with_capacity(total_len*3);
     for pos in 0..total_len{
         let mutations_at_pos = get_1bp_mutations(&seq_plain, pos).into_iter().map(|x| (x,pos));
         for matp in mutations_at_pos{

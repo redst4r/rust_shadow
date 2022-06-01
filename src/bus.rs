@@ -168,8 +168,6 @@ impl Iterator for BusIteratorBuffered {
 }
 
 
-    
-    
 pub struct CellIterator {
     busiter: BusIteratorBuffered,
     last_record: BusRecord
