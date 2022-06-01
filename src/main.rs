@@ -28,7 +28,8 @@ enum MyCommand {
     cb(FastqArgs),
     cb_umi_exact(FastqArgs),
     cb_umi_sketch(FastqArgs),
-    cb_umi_cell(BusArgs)
+    cb_umi_cell(BusArgs),
+    cb_umi_cell_aggr(BusArgs)
 }
 
 #[derive(Args)]
@@ -81,8 +82,12 @@ fn main() {
         },
         MyCommand::cb_umi_cell(args) => {
             println!("Doing CB_UMI via single cells");
-            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax)  
+            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax, false)  
         }
+        MyCommand::cb_umi_cell_aggr(args) => {
+            println!("Doing AGGREGATE CB_UMI via single cells");
+            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax, true)  
+        }        
     };
 
 
