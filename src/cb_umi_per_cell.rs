@@ -11,7 +11,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 #[cfg(test)]
 #[test]
 fn main(){
-    run(&"/home/michi/output.corrected.sort.bus".to_string(), &"/tmp/cb.csv".to_string(), 1000)
+    run(&"/home/michi/output.corrected.sort.bus".to_string(), &"/tmp/cb.csv".to_string(), 1000, false)
 }
 
 
@@ -74,9 +74,9 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
     // count UMI frequencies
     let mut freq_map: Counter<CbUmi, u32> = Counter::new();
 
-    for cbumi in bus_records.iter().map(|r| bus_record_to_cbumi(r) ){
+    for (cbumi, frequency) in bus_records.iter().map(|r| (bus_record_to_cbumi(r), r.COUNT) ){
         let c = freq_map.entry(cbumi).or_insert(0);
-        *c +=1;
+        *c += frequency;
     }
     let correct_umis = find_correct_umis(&freq_map); 
 
