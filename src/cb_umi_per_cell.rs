@@ -35,6 +35,8 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize){
         bar.inc(df_single_cell.height() as u64);
         number_of_umis_seen += df_single_cell.height();
 
+        // aggregate the counts of errors across UMIs
+        let df_single_cell = df_single_cell.groupby(["CB"]).unwrap().sum().unwrap();
 
         if df.is_empty(){
             df = df_single_cell;
@@ -74,13 +76,16 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
         let c = freq_map.entry(cbumi).or_insert(0);
         *c +=1;
     }
-
     let correct_umis = find_correct_umis(&freq_map); 
 
     // find the shadows 
     let mut polars_data: HashMap<String, Vec<u32>> = HashMap::new();
     let mut cellnames: Vec<String> = Vec::new();
     let mut umis: Vec<String> = Vec::new();
+
+    // TODO pretty stupid to do it like this, i.e iterating over all potential shadows
+    // we could just build a BKTree out of all records and easily query for related seqs
+    // onnly problem: we'd have to figure out the position of the mutation
 
     for mc in correct_umis{
         let mc2 = mc.clone();
@@ -114,9 +119,6 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
 
 }
 
-
-
-
 pub fn find_correct_umis(counter: &Counter<CbUmi, u32>) -> Vec<CbUmi>{
 
     // TODO we can probably speed this up. All the elements in Counter have the SAME CB!! not useful in the BKtree and just slows it down
@@ -125,31 +127,20 @@ pub fn find_correct_umis(counter: &Counter<CbUmi, u32>) -> Vec<CbUmi>{
     let mut bk: BkTree<String> = BkTree::new(my_hamming);
     let mut correct_umis: Vec<CbUmi> = Vec::new();
 
-    let mut c = 0;
-    // let bar = ProgressBar::new(counter.len() as u64);
-
     for (cbumi, _freq) in counter.most_common(){
-        // bar.inc(1);
 
         let umi = cbumi.umi.clone();
         let matches = bk.find(umi.clone(), 1);
         if matches.len() == 0{
             correct_umis.push(cbumi.clone());  // add it to the topN list
             bk.insert(umi);
-            c += 1;
         }
         else{
             bk.insert(umi);
-        }
-
-        // if c >= n{
-            // break
-        // }
-        // if c % 1_000 == 0{
-        //     println!("BKTree Iteration {c}");
-        // }          
+        }     
     }
-    // bar.finish();
-
     correct_umis
 }
+
+
+
