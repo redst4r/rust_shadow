@@ -22,7 +22,7 @@ use streaming_algorithms::Top;
 // use indicatif::ProgressBar;
 
 
-pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
+pub fn run_top_n(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
@@ -198,7 +198,7 @@ pub fn run_topN(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fil
 
 
 
-pub fn run_GB1(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
+pub fn run_gb_one(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
     
     let whitelist = parse_whitelist_gz(whitelist_file);
     println!("Whitelist len {}", whitelist.len());
@@ -208,14 +208,14 @@ pub fn run_GB1(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file
     // first pass over data, storing all elements #>1
     let tol = 1e-9;
     let prob = 1e-4;
-    let mut GB1 :GreaterThan1Bloom<> = GreaterThan1Bloom::new(prob, tol);
+    let mut gb1 :GreaterThan1Bloom<> = GreaterThan1Bloom::new(prob, tol);
 
     for (i, cbumi) in my_iter.enumerate(){
         let cm_umi_str = cbumi.to_string();
-        GB1.add_item(&cm_umi_str);
+        gb1.add_item(&cm_umi_str);
         if i % 1_000_000 == 0{
             println!("Iteration {} Mio", i/1_000_000);
-            GB1.status();
+            gb1.status();
         }        
     }
 }

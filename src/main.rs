@@ -76,7 +76,7 @@ fn main() {
         },
         MyCommand::cb_umi_sketch(args) => {
             println!("Doing CB_UMI sketch");
-            cb_umi_sketch::run_topN(&args.fastq_list, args.whitelist, cli.output, args.topn)
+            cb_umi_sketch::run_top_n(&args.fastq_list, args.whitelist, cli.output, args.topn)
             
         },
         MyCommand::cb_umi_cell(args) => {

@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 use bktree::BkTree;
 use crate::bus::{CellIterator, BusRecord};
-use crate::utils::{int_to_seq, CbUmi, write_to_csv, my_hamming};
+use crate::utils::{int_to_seq, CbUmi, write_to_csv, my_hamming, seq_to_int};
 use counter::Counter;
-use crate::cb_umi_errors::{find_shadows};
+use crate::cb_umi_errors::find_shadows;
 use polars::prelude::*;
 
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 
 #[cfg(test)]
 #[test]
 fn main(){
-    run(&"/home/michi/output.corrected.sort.bus".to_string(), &"/tmp/cb.csv".to_string(), 100_000)
+    run(&"/home/michi/output.corrected.sort.bus".to_string(), &"/tmp/cb.csv".to_string(), 1000)
 }
 
 
@@ -21,23 +21,29 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize){
 
     let mut df = DataFrame::default();
     let bar = ProgressBar::new(nmax as u64);
+    bar.set_style(ProgressStyle::default_bar()
+        .template("[{elapsed_precise} ETA {eta}] {bar:40.cyan/blue} {pos}/{len} {per_sec}")
+        .progress_chars("##-"));
 
-    for (i, records) in cb_iter.map(|(_cb, rec)| rec).filter(|rec| rec.len()>100).enumerate(){
-        // println!("Doing cell with #{} records", records.len());
+    let mut number_of_umis_seen = 0;
+    for records in cb_iter
+        .map(|(_cb, rec)| rec)
+        .filter(|rec| rec.len()>100){
+
         let df_single_cell = do_single_cb(records);
+
+        bar.inc(df_single_cell.height() as u64);
+        number_of_umis_seen += df_single_cell.height();
+
+
         if df.is_empty(){
             df = df_single_cell;
-            bar.inc(df.height() as u64);
         }
         else{
             df = df.vstack(&df_single_cell).unwrap();
-            bar.inc(df_single_cell.height() as u64);
         }
-        // if i % 100 == 0{
-        //     println!("Iteration/Cell {}", i);
-        //     println!("current height {}", df.height());
-        // }
-        if df.height() > nmax{
+
+        if number_of_umis_seen > nmax{
             bar.finish();
             break
         }
