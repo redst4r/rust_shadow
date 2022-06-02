@@ -37,7 +37,14 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
 
         if aggregate{
             // aggregate the counts of errors across UMIs
-            df_single_cell = df_single_cell.groupby(["CB"]).unwrap().sum().unwrap();
+            // df_single_cell = df_single_cell.groupby(["CB"]).unwrap().sum().unwrap();
+            df_single_cell = df_single_cell.lazy()
+                .groupby([col("CB")])
+                .agg([
+                    col("*").sum(),
+                    col("n_total").eq(lit(1)).sum().alias("singeltons")
+                ]).collect().unwrap();
+
         }
         if df.is_empty(){
             df = df_single_cell;
@@ -93,11 +100,17 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
         let mc2 = mc.clone();
         let nshadows_per_position = find_shadows(mc, &freq_map);
 
+        let mut total_shadows = 0; // the total shadows (sum over positions) for this one CB/UMI
         for (position, n_shadows) in nshadows_per_position.iter(){
-            polars_data.entry(format!("position_{position}")).or_insert(vec![]).push(*n_shadows)
+            polars_data.entry(format!("position_{position}")).or_insert(vec![]).push(*n_shadows);
+            total_shadows += *n_shadows;
         }
         let total_counts = freq_map.get(&mc2).unwrap();
         polars_data.entry("n_real".into()).or_insert(vec![]).push(*total_counts);
+
+        // also keep track of the single molucule events, we cant tell if those are real or shadow
+        polars_data.entry("n_total".into()).or_insert(vec![]).push(*total_counts+total_shadows);
+
 
         cellnames.push(mc2.cb);
         umis.push(mc2.umi);
