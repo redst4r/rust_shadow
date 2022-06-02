@@ -193,7 +193,7 @@ pub fn seq_to_int(seq: String) -> u64{
 pub fn int_to_seq(i: u64, seq_len:u64) -> String{
 
     let mut q = i;
-    let mut result: Vec<u64> = Vec::new();
+    let mut result: Vec<u64> = Vec::with_capacity(seq_len as usize);
     while q>= 4{
         let quotient = q / 4;
         let remainder = q % 4;
@@ -228,7 +228,7 @@ pub fn my_hamming(a: &String, b: &String) -> isize {
     // hamming distance for two strings of the same size
     assert_eq!(a.len(), b.len());
     let mut counter: isize = 0;
-    for (c1, c2) in  std::iter::zip((*a).chars(), (*b).chars()){
+    for (c1, c2) in  std::iter::zip((*a).chars(), (*b).chars()){  // todo: change to bytes, might be faster
         if c1 != c2{
             counter +=1 ;
         }

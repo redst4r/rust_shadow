@@ -17,7 +17,7 @@ bincode = "1.2.1"
 # fastq = "0.6"
 counter = "0.5"
 bktree = "1"
-polars = "0.21"
+polars = {version = "0.21", features =["parquet", "lazy"]}
 streaming_algorithms = "*"
 indicatif = "0.16"
 clap = { version = "3.1.18", features = ["derive"] }
