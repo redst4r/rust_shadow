@@ -14,6 +14,7 @@ fn main(){
     run(&"/home/michi/output.corrected.sort.bus".to_string(), &"/tmp/cb.csv".to_string(), 1000, true)
 }
 
+const POLYT_THRESHOLD: u32 = 9;
 
 pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
@@ -31,6 +32,14 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
         .filter(|rec| rec.len()>100){
 
         let mut df_single_cell = do_single_cb(records);
+
+        // filter the UMI entries that have really high T nucleotide content
+        let nT = df_single_cell.column("number_of_T").unwrap().u32().unwrap();
+        let mask = nT.lt(POLYT_THRESHOLD);
+
+        // println!("Size before filter {}", df_single_cell.height());
+        df_single_cell = df_single_cell.filter(&mask).unwrap();
+        // println!("Size after filter {}", df_single_cell.height());
 
         bar.inc(df_single_cell.height() as u64);
         number_of_umis_seen += df_single_cell.height();
@@ -126,13 +135,52 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
     
     let df = DataFrame::new(vec_series).unwrap();
 
+    let mut counter_A: Vec<u32> = Vec::new();
+    let mut counter_C: Vec<u32> = Vec::new();
+    let mut counter_G: Vec<u32> = Vec::new();
+    let mut counter_T: Vec<u32> = Vec::new();
+    
+    for u in umis.iter(){
+        let (cA, cC, cG, cT) = sequence_composition(&u);
+        counter_A.push(cA);
+        counter_C.push(cC);
+        counter_G.push(cG);
+        counter_T.push(cT);
+    }
+
     let df_cb = Series::new("CB", cellnames);
     let df_umi = Series::new("UMI", umis);
+    let df_nA = Series::new("number_of_A", counter_A);
+    let df_nC = Series::new("number_of_C", counter_C);
+    let df_nG = Series::new("number_of_G", counter_G);
+    let df_nT = Series::new("number_of_T", counter_T);
 
-    let df_final = df.hstack(&[df_cb, df_umi]).unwrap();    
+
+    let df_final = df.hstack(&[df_cb, df_umi, df_nA, df_nC, df_nG, df_nT]).unwrap();    
     df_final
 
 }
+
+fn sequence_composition(s: &String) -> (u32, u32,u32,u32){
+    let mut counterA = 0;
+    let mut counterC = 0;
+    let mut counterG = 0;
+    let mut counterT = 0;
+
+    for c in s.chars(){
+        match c{
+            'A' => counterA+=1,
+            'C' => counterC+=1,
+            'G' => counterG+=1,
+            'T' => counterT+=1,
+            _ => panic!("Unknown char {}", c)
+        }
+    }
+
+    return (counterA, counterC, counterG, counterT)
+
+}
+
 
 pub fn find_correct_umis(counter: &Counter<CbUmi, u32>) -> Vec<CbUmi>{
 
