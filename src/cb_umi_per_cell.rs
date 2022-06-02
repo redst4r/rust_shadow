@@ -11,7 +11,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 #[cfg(test)]
 #[test]
 fn main(){
-    run(&"/home/michi/output.corrected.sort.bus".to_string(), &"/tmp/cb.csv".to_string(), 1000, false)
+    run(&"/home/michi/output.corrected.sort.bus".to_string(), &"/tmp/cb.csv".to_string(), 1000, true)
 }
 
 
@@ -30,14 +30,14 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
         .map(|(_cb, rec)| rec)
         .filter(|rec| rec.len()>100){
 
-        let df_single_cell = do_single_cb(records);
+        let mut df_single_cell = do_single_cb(records);
 
         bar.inc(df_single_cell.height() as u64);
         number_of_umis_seen += df_single_cell.height();
 
         if aggregate{
             // aggregate the counts of errors across UMIs
-            let df_single_cell = df_single_cell.groupby(["CB"]).unwrap().sum().unwrap();
+            df_single_cell = df_single_cell.groupby(["CB"]).unwrap().sum().unwrap();
         }
         if df.is_empty(){
             df = df_single_cell;
