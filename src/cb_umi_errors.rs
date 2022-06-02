@@ -37,12 +37,9 @@ pub fn top_n(counter: &Counter<CbUmi, u32>, n: usize) -> Vec<CbUmi>{
         let matches = bk.find(cbumi.to_string(), 1);
         if matches.len() == 0{
             top2.push(cbumi.clone());  // add it to the topN list
-            bk.insert(cbumi.to_string());
             c += 1;
         }
-        else{
-            bk.insert(cbumi.to_string());
-        }
+        bk.insert(cbumi.to_string());
 
         if c >= n{
             break

@@ -55,13 +55,10 @@ pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
         if bk.find(cb, 1).len() == 0{
             // let cb_umi = format!("{cb}_{umi}");
             top2.push(cb2.clone());  // add it to the topN list
-            bk.insert(cb2);
             c += 1;
         }
-        else{
-            bk.insert(cb2); // add it to the BKtree anyways, see function header for explain
+        bk.insert(cb2); // add it to the BKtree anyways, see function header for explain
 
-        }
         if c >= n{
             break
         }

@@ -135,11 +135,8 @@ pub fn find_correct_umis(counter: &Counter<CbUmi, u32>) -> Vec<CbUmi>{
         let matches = bk.find(umi.clone(), 1);
         if matches.len() == 0{
             correct_umis.push(cbumi.clone());  // add it to the topN list
-            bk.insert(umi);
         }
-        else{
-            bk.insert(umi);
-        }     
+        bk.insert(umi);
     }
     correct_umis
 }
@@ -161,11 +158,8 @@ pub fn find_correct_umis_faster(counter: &Counter<CbUmi, u32>) -> (Vec<CbUmi>, B
         let matches = bk.find(umi.clone(), 1);
         if matches.len() == 0{
             correct_umis.push(cbumi.clone());  // add it to the topN list
-            bk.insert(umi);
         }
-        else{
-            bk.insert(umi);
-        }     
+        bk.insert(umi);
     }
     (correct_umis, bk)
 }

@@ -14,7 +14,7 @@
 use counter::Counter;
 use std::collections::HashMap;
 use crate::utils::{write_to_csv, parse_whitelist_gz, all_mutations_for_cbumi, fastq_iter, CbUmi} ;
-use crate::sketching::GreaterThan1Bloom;
+// use crate::sketching::GreaterThan1Bloom;
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use streaming_algorithms::Top;
@@ -198,24 +198,24 @@ pub fn run_top_n(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fi
 
 
 
-pub fn run_gb_one(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
+// pub fn run_gb_one(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String){
     
-    let whitelist = parse_whitelist_gz(whitelist_file);
-    println!("Whitelist len {}", whitelist.len());
+//     let whitelist = parse_whitelist_gz(whitelist_file);
+//     println!("Whitelist len {}", whitelist.len());
 
-    let my_iter = fastq_iter(fastq_list);
+//     let my_iter = fastq_iter(fastq_list);
 
-    // first pass over data, storing all elements #>1
-    let tol = 1e-9;
-    let prob = 1e-4;
-    let mut gb1 :GreaterThan1Bloom<> = GreaterThan1Bloom::new(prob, tol);
+//     // first pass over data, storing all elements #>1
+//     let tol = 1e-9;
+//     let prob = 1e-4;
+//     let mut gb1 :GreaterThan1Bloom<> = GreaterThan1Bloom::new(prob, tol);
 
-    for (i, cbumi) in my_iter.enumerate(){
-        let cm_umi_str = cbumi.to_string();
-        gb1.add_item(&cm_umi_str);
-        if i % 1_000_000 == 0{
-            println!("Iteration {} Mio", i/1_000_000);
-            gb1.status();
-        }        
-    }
-}
+//     for (i, cbumi) in my_iter.enumerate(){
+//         let cm_umi_str = cbumi.to_string();
+//         gb1.add_item(&cm_umi_str);
+//         if i % 1_000_000 == 0{
+//             println!("Iteration {} Mio", i/1_000_000);
+//             gb1.status();
+//         }        
+//     }
+// }
