@@ -268,12 +268,7 @@ mod tests {
 
     #[test]
     fn decode_seq(){
-        let x = vec![0,1,2,3,4,5,6,7,8];
-        // for i in x{
-        //     println!("DECDODED {}:{:?}", i, int_to_seq(i, 5));
-        // }
-
-
+ 
         //  base order
         assert_eq!(int_to_seq(0, 1), "A");
         assert_eq!(int_to_seq(1, 1), "C");

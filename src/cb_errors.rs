@@ -68,13 +68,6 @@ pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
     }
     assert_eq!(top2.len(), n);
 
-    // // for now, all the frequent CB/UMIs are the elements of the BKTree
-    // // put them into a vector
-    // let mut top2: Vec<String> = Vec::new();
-
-    // for cb in bk.into_iter(){
-    //     top2.push(cb);
-    // }
     top2
 }
 
@@ -116,18 +109,6 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     
     let countmap = count_cb_filelist(fastq_list);
     println!("len of counter {}", countmap.len());
-
-    println!("saving counter to file /tmp/test.csv");
-    let mut cbs: Vec<String> = Vec::new();
-    let mut freqs: Vec<i32> = Vec::new();
-    for (k,v ) in countmap.iter(){
-        cbs.push(k.clone());
-        freqs.push(*v);
-    }
-    let df_cb = Series::new("CB", cbs);
-    let df_freq = Series::new("frequency", freqs);
-    let mut df_ = DataFrame::new(vec![df_cb, df_freq]).unwrap();
-    write_to_csv(&mut df_, "/tmp/test.csv".to_string());
 
     // now the hard part: group by CB, look at all UMIs therein
     println!("calculating most common");

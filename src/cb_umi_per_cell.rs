@@ -34,8 +34,8 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
         let mut df_single_cell = do_single_cb(records);
 
         // filter the UMI entries that have really high T nucleotide content
-        let nT = df_single_cell.column("number_of_T").unwrap().u32().unwrap();
-        let mask = nT.lt(POLYT_THRESHOLD);
+        let nt = df_single_cell.column("number_of_T").unwrap().u32().unwrap();
+        let mask = nt.lt(POLYT_THRESHOLD);
 
         // println!("Size before filter {}", df_single_cell.height());
         df_single_cell = df_single_cell.filter(&mask).unwrap();
@@ -135,49 +135,49 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
     
     let df = DataFrame::new(vec_series).unwrap();
 
-    let mut counter_A: Vec<u32> = Vec::new();
-    let mut counter_C: Vec<u32> = Vec::new();
-    let mut counter_G: Vec<u32> = Vec::new();
-    let mut counter_T: Vec<u32> = Vec::new();
+    let mut counter_a: Vec<u32> = Vec::new();
+    let mut counter_c: Vec<u32> = Vec::new();
+    let mut counter_g: Vec<u32> = Vec::new();
+    let mut counter_t: Vec<u32> = Vec::new();
     
     for u in umis.iter(){
-        let (cA, cC, cG, cT) = sequence_composition(&u);
-        counter_A.push(cA);
-        counter_C.push(cC);
-        counter_G.push(cG);
-        counter_T.push(cT);
+        let (ca, cc, cg, ct) = sequence_composition(&u);
+        counter_a.push(ca);
+        counter_c.push(cc);
+        counter_g.push(cg);
+        counter_t.push(ct);
     }
 
     let df_cb = Series::new("CB", cellnames);
     let df_umi = Series::new("UMI", umis);
-    let df_nA = Series::new("number_of_A", counter_A);
-    let df_nC = Series::new("number_of_C", counter_C);
-    let df_nG = Series::new("number_of_G", counter_G);
-    let df_nT = Series::new("number_of_T", counter_T);
+    let df_na = Series::new("number_of_A", counter_a);
+    let df_nc = Series::new("number_of_C", counter_c);
+    let df_ng = Series::new("number_of_G", counter_g);
+    let df_nt = Series::new("number_of_T", counter_t);
 
 
-    let df_final = df.hstack(&[df_cb, df_umi, df_nA, df_nC, df_nG, df_nT]).unwrap();    
+    let df_final = df.hstack(&[df_cb, df_umi, df_na, df_nc, df_ng, df_nt]).unwrap();    
     df_final
 
 }
 
 fn sequence_composition(s: &String) -> (u32, u32,u32,u32){
-    let mut counterA = 0;
-    let mut counterC = 0;
-    let mut counterG = 0;
-    let mut counterT = 0;
+    let mut counter_a = 0;
+    let mut counter_c = 0;
+    let mut counter_g = 0;
+    let mut counter_t = 0;
 
     for c in s.chars(){
         match c{
-            'A' => counterA+=1,
-            'C' => counterC+=1,
-            'G' => counterG+=1,
-            'T' => counterT+=1,
+            'A' => counter_a+=1,
+            'C' => counter_c+=1,
+            'G' => counter_g+=1,
+            'T' => counter_t+=1,
             _ => panic!("Unknown char {}", c)
         }
     }
 
-    return (counterA, counterC, counterG, counterT)
+    return (counter_a, counter_c, counter_g, counter_t)
 
 }
 
