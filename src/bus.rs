@@ -55,31 +55,6 @@ impl BusHeader {
 }
 
 
-// fn read_bus_records(fname: &str) -> Vec<BusRecord>{
-
-//     let mut file = std::fs::File::open(fname).expect("FAIL");
-
-//     let header = BusHeader::from_file(&fname.into());
-//     // move the cursor across the header to the first entry
-//     let to_seek:u64 = BUS_HEADER_SIZE.try_into().unwrap();
-//     let hhh: u64 = header.tlen.into();
-//     let _x = file.seek(SeekFrom::Start(to_seek + hhh)).unwrap();
-
-
-//     let mut buf = BufReader::new(file);
-//     let mut records: Vec<BusRecord> = Vec::new();
-//     let mut record_bytes = [0; BUS_ENTRY_SIZE];
-//     loop {
-//         match buf.read(&mut record_bytes) {
-//             Ok(0) => break,
-//             Ok(BUS_ENTRY_SIZE) => records.push(bincode::deserialize(&record_bytes).unwrap()),
-//             Ok(n) => panic!("{:?}", n),
-//             Err(e) => panic!("{:?}", e),
-//         };
-//     }
-//     records
-// }
-
 pub struct BusWriter{
     pub buf: BufWriter<File>,
     pub header: BusHeader
@@ -118,9 +93,12 @@ impl BusWriter {
         self.buf.write(&binrecord).expect("FAILED to write record");
     }
     pub fn write_records(&mut self, records: &Vec<BusRecord>){
+        // writes several recordsd and flushes
         for r in records{
             self.write_record(r)
         }
+        self.buf.flush().unwrap();
+
     }
 
 }
@@ -144,7 +122,7 @@ impl BusIteratorBuffered {
         let hhh: u64 = bus_header.tlen.into();
         let _x = file_handle.seek(SeekFrom::Start(to_seek + hhh)).unwrap();
 
-        let mut buf = BufReader::new(file_handle);
+        let buf = BufReader::new(file_handle);
         // let mut buf = BufReader::with_capacity(8000, file_handle);
         BusIteratorBuffered {bus_header, buf }
     }
@@ -167,18 +145,18 @@ impl Iterator for BusIteratorBuffered {
     }
 }
 
-
+//=================================================================================
 pub struct CellIterator {
     busiter: BusIteratorBuffered,
-    last_record: BusRecord
+    last_record: Option<BusRecord>  //option needed to mark the final element of the iteration
 }
 
 impl CellIterator {
 
     pub fn new(fname: &String) ->CellIterator{
-        let mut b = BusIteratorBuffered::new(fname);
-        let mut last_record = b.next().unwrap(); //initilize with the first record in the file
-        CellIterator {busiter: b, last_record: last_record}
+        let mut busiter = BusIteratorBuffered::new(fname);
+        let last_record = busiter.next(); //initilize with the first record in the file
+        CellIterator {busiter, last_record}
     }
 }
 
@@ -187,50 +165,69 @@ impl Iterator for CellIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
 
-        let mut busrecords: Vec<BusRecord> = Vec::new();
-
-        // for new_record in self.busiter{
+        println!("Calling next() in CellIterator");
+        let mut busrecords: Vec<BusRecord> = Vec::new(); // storing the result to be emitted
+        
+        println!("Last record {:?}", self.last_record);
         loop {
-            if let Some(new_record) = self.busiter.next(){
-                let current_cb = self.last_record.CB;
-                if new_record.CB != current_cb {  // we ran into a new CB and its records
-                    busrecords.push(self.last_record); // the stored element from the previous iteration
-                    self.last_record = new_record;
-                    return Some((current_cb, busrecords));
-                }
-                else{
-                    busrecords.push(self.last_record);
-                    self.last_record = new_record;
-                }
-            }
-            else {
-                // we ran pas the last entry of the file
-                break
-            }
-        }
+            if let Some(last_record) = self.last_record{  //if we're not done with the iteration
+                // try to get a new record
+                if let Some(new_record) = self.busiter.next(){
 
-        // emit the last cell if there' still something
-        if busrecords.len() > 0{
-            let current_cb = self.last_record.CB;
-            busrecords.push(self.last_record);
-            return Some((current_cb, busrecords));  
-        }
-        else{
-            return None
+                    // determine if we encounter a new cell in this iteration
+                    let current_cb = last_record.CB;
+                    if new_record.CB > current_cb {  
+                        // we ran into a new CB and its records
+                        busrecords.push(last_record); // the stored element from the previous iteration
+                        println!("\tyielding {:?}", (current_cb, &busrecords));
+                        self.last_record = Some(new_record);
+
+                        return Some((current_cb, busrecords));
+                    }
+                    else if new_record.CB == current_cb {
+                        busrecords.push(last_record);
+                        self.last_record = Some(new_record);
+
+                    }
+                    else{  // the new cb is smaller then the current state: this is a bug due to an UNOSORTED busfile
+                        panic!("Unsorted busfile: {} -> {}", current_cb, new_record.CB)
+                    }
+                }
+                else {
+                    // we ran pas the last entry of the file
+                    // FINALize the last emit
+                    busrecords.push(last_record);
+                    let current_cb = last_record.CB;
+                    // to mark the end of iteration and all items emitted, set last_item to None
+                    self.last_record = None;
+                    return Some((current_cb, busrecords));  
+                }
+            }
+            else{  // last_record == None
+                // we are done
+                return None
+            }
         }
     }
 }
 
+//=================================================================================
 #[cfg(test)]
 mod tests {
     use std::io::Write;
     use crate::bus::{BusRecord, BusHeader, CellIterator, BusIteratorBuffered, BusWriter};
 
+    fn setup_busfile(records: Vec<BusRecord>, busname: &String){
+        let header = BusHeader::new(16, 12, 20);
+        let mut writer = BusWriter::new(&busname, header);
+        writer.write_records(&records);
+    }
+
     #[test]
     fn test_read_write_header(){
         let r1 = BusRecord{CB: 1, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
         let header = BusHeader::new(16, 12, 20);
-        let busname = "/tmp/test.bus".to_string();
+        let busname = "/tmp/test_read_write_header.bus".to_string();
         let mut writer = BusWriter::new(&busname, header);
         writer.write_record(&r1);
         writer.buf.flush().unwrap();
@@ -238,7 +235,6 @@ mod tests {
         let bheader = BusHeader::from_file(&busname);
         let header = BusHeader::new(16, 12, 20);
         assert_eq!(header, bheader);
-
     }
 
     #[test]
@@ -246,13 +242,8 @@ mod tests {
         let r1 = BusRecord{CB: 1, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
         let r2 = BusRecord{CB: 0, UMI: 21, EC: 1, COUNT: 2, FLAG: 0};
 
-        // "BUS\0".into_bytes()[0..4];
-        let header = BusHeader::new(16, 12, 20);
-        let busname = "/tmp/test.bus".to_string();
-        let mut writer = BusWriter::new(&busname, header);
-        writer.write_record(&r1);
-        writer.write_record(&r2);
-        writer.buf.flush().unwrap();
+        let busname = "/tmp/test_read_write.bus".to_string();
+        setup_busfile(vec![r1,r2], &busname);
 
         let mut reader = BusIteratorBuffered::new(&busname);
         let e1 = reader.next().unwrap();
@@ -261,46 +252,66 @@ mod tests {
 
         let e2 = reader.next().unwrap();
         assert_eq!(e2, r2);
+        assert_eq!(reader.next(), None);
 
         // let records: Vec<BusRecord> = reader.into_iter().collect();
         // assert_eq!(records, vec![r1, r2])
 
     }
 
+    #[test]
+    #[should_panic(expected = "Unsorted busfile: 2 -> 0")]
+    fn test_panic_on_unsorted(){  
+        let r1 = BusRecord{CB: 0, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
+        let r2 = BusRecord{CB: 0, UMI: 21, EC: 1, COUNT: 2, FLAG: 0};
+        let r3 = BusRecord{CB: 2, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
+        let r4 = BusRecord{CB: 0, UMI: 1, EC: 1, COUNT: 2, FLAG: 0};
 
+        let records = vec![r1,r2,r3,r4];
+
+        let busname = "/tmp/test_panic_on_unsorted.bus".to_string();
+        setup_busfile(records, &busname);
+
+        let cb_iter = CellIterator::new(&busname);
+        let n: Vec<(u64, Vec<BusRecord>)> = cb_iter.collect();
+    }
 
     #[test]
     fn test_iter(){   
         let r1 = BusRecord{CB: 0, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
         let r2 = BusRecord{CB: 0, UMI: 21, EC: 1, COUNT: 2, FLAG: 0};
         let r3 = BusRecord{CB: 1, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
-        let r4 = BusRecord{CB: 2, UMI: 21, EC: 1, COUNT: 2, FLAG: 0};
+        let r4 = BusRecord{CB: 2, UMI: 1, EC: 1, COUNT: 2, FLAG: 0};
         let r5 = BusRecord{CB: 2, UMI: 21, EC: 1, COUNT: 2, FLAG: 0};
-        let records = vec![r1,r2,r3,r4,r5];
+        let r6 = BusRecord{CB: 3, UMI: 1, EC: 1, COUNT: 2, FLAG: 0};
 
-        let busname = "/tmp/test.bus".to_string();
-        let header = BusHeader::new(16, 12, 20);
-        let mut writer = BusWriter::new(&busname, header);
-        writer.write_records(&records);
-        writer.buf.flush().unwrap();
+        let records = vec![r1,r2,r3,r4,r5, r6];
+
+        let busname = "/tmp/test_iter.bus".to_string();
+        setup_busfile(records, &busname);
 
 
-        // let mut reader = BusIteratorBuffered::new(&busname);
         let cb_iter = CellIterator::new(&busname);
-        let n: Vec<Vec<BusRecord>> = cb_iter.map(|(_cb, rec)| rec).collect();
+        // let n: Vec<Vec<BusRecord>> = cb_iter.map(|(_cb, rec)| rec).collect();
+        let n: Vec<(u64, Vec<BusRecord>)> = cb_iter.collect();
+        println!("{:?}", n);
+
+        assert_eq!(n.len(), 4);
         // println!("{:?}", n);
         // println!("First");
         let c1 = &n[0];
-        assert_eq!(*c1, vec![r1,r2]);
+        assert_eq!(*c1, (0, vec![r1,r2]));
 
         // println!("Second");
         let c2 = &n[1];
-        assert_eq!(*c2, vec![r3]);
+        assert_eq!(*c2, (1,vec![r3]));
 
         // println!("Third");
         let c3 = &n[2];
-        assert_eq!(*c3, vec![r4,r5]);
+        assert_eq!(*c3, (2, vec![r4,r5]));
 
+        let c4 = &n[3];
+        assert_eq!(*c4, (3, vec![r6]));
 
         // assert_eq!(n, vec![vec![r1,r2], vec![r3], vec![r4,r5]])
 
