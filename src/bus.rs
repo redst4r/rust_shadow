@@ -165,10 +165,8 @@ impl Iterator for CbUmiIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
 
-        println!("Calling next() in CbUmiIterator");
         let mut busrecords: Vec<BusRecord> = Vec::new(); // storing the result to be emitted
         
-        println!("Last record {:?}", self.last_record);
         loop {
             if let Some(last_record) = self.last_record{  //if we're not done with the iteration
                 // try to get a new record
@@ -181,7 +179,7 @@ impl Iterator for CbUmiIterator {
                     if new_record.CB > current_cb || (new_record.CB == current_cb &&  new_record.UMI > current_umi){  
                         // we ran into a new CB/UMI and its records
                         busrecords.push(last_record); // the stored element from the previous iteration
-                        println!("\tyielding {:?}", (current_cb, &busrecords));
+                        // println!("\tyielding {:?}", (current_cb, &busrecords));
                         self.last_record = Some(new_record);
 
                         return Some(((current_cb, current_umi), busrecords));
@@ -234,10 +232,8 @@ impl Iterator for CellIterator {
 
     fn next(&mut self) -> Option<Self::Item> {
 
-        println!("Calling next() in CellIterator");
         let mut busrecords: Vec<BusRecord> = Vec::new(); // storing the result to be emitted
         
-        println!("Last record {:?}", self.last_record);
         loop {
             if let Some(last_record) = self.last_record{  //if we're not done with the iteration
                 // try to get a new record
@@ -248,7 +244,7 @@ impl Iterator for CellIterator {
                     if new_record.CB > current_cb {  
                         // we ran into a new CB and its records
                         busrecords.push(last_record); // the stored element from the previous iteration
-                        println!("\tyielding {:?}", (current_cb, &busrecords));
+                        // println!("\tyielding {:?}", (current_cb, &busrecords));
                         self.last_record = Some(new_record);
 
                         return Some((current_cb, busrecords));

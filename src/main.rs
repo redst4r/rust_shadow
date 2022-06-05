@@ -9,6 +9,9 @@ mod utils;
 
 use clap::{self, Parser, Subcommand, Args};
 mod bus;
+mod bus_multi;
+// mod merger;
+mod busmerger;
 mod cb_umi_per_cell;
 
 #[derive(Parser)]
@@ -29,7 +32,8 @@ enum MyCommand {
     cb_umi_exact(FastqArgs),
     cb_umi_sketch(FastqArgs),
     cb_umi_cell(BusArgs),
-    cb_umi_cell_aggr(BusArgs)
+    cb_umi_cell_aggr(BusArgs),
+    busmerge(BusMergeArgs)
 }
 
 #[derive(Args)]
@@ -56,6 +60,19 @@ struct BusArgs{
     /// Max #entries to consider in the bus file
     #[clap(short = 'n', long= "nmax")] 
     nmax: usize
+}
+
+#[derive(Args)]
+struct BusMergeArgs{
+    #[clap(long= "i1")] 
+    inbus1: String,
+    #[clap(long= "i2")] 
+    inbus2: String,
+
+    #[clap(long= "o1")] 
+    outbus1: String,
+    #[clap(long= "o2")] 
+    outbus2: String,  
 }
 
 fn main() {
@@ -86,8 +103,12 @@ fn main() {
         }
         MyCommand::cb_umi_cell_aggr(args) => {
             println!("Doing AGGREGATE CB_UMI via single cells");
-            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax, true)  
-        }        
+            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax, true)
+        }
+        MyCommand::busmerge(args) => {
+            println!("Doing bus merging");
+            busmerger::merge_busfiles_on_overlap(args.inbus1, args.inbus2, args.outbus1, args.outbus2)      
+        }
     };
 
 
