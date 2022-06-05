@@ -26,7 +26,7 @@ pub fn fastq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
     my_iter
 }
 
-pub fn parse_whitelist_gz(fname: String) -> HashSet<String>{
+pub fn parse_whitelist_gz(fname: &String) -> HashSet<String>{
     // loading 10x CB whilelist from file
     let decoder = bgzf::Reader::from_path(fname).unwrap();
     let reader = BufReader::new(decoder);

@@ -23,7 +23,7 @@ use streaming_algorithms::Top;
 
 
 pub fn run_top_n(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
-    let whitelist = parse_whitelist_gz(whitelist_file);
+    let whitelist = parse_whitelist_gz(&whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
     let my_iter = fastq_iter(fastq_list);

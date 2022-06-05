@@ -79,7 +79,7 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
 
 
     // parse whitelist
-    let whitelist = parse_whitelist_gz(whitelist_file);
+    let whitelist = parse_whitelist_gz(&whitelist_file);
     println!("Whitelist len {}", whitelist.len());
     
     let countmap = count_cb_filelist(fastq_list);

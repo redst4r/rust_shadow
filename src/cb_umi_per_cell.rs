@@ -15,6 +15,7 @@ fn main(){
 }
 
 const POLYT_THRESHOLD: u32 = 9;
+const RECORD_SIZE_THRESHOLD: usize = 100;
 
 pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
@@ -29,7 +30,8 @@ pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
     let mut number_of_umis_seen = 0;
     for records in cb_iter
         .map(|(_cb, rec)| rec)
-        .filter(|rec| rec.len()>100){
+        .filter(|rec| rec.len()>RECORD_SIZE_THRESHOLD)
+        {
 
         let mut df_single_cell = do_single_cb(records);
 
