@@ -146,6 +146,75 @@ impl Iterator for BusIteratorBuffered {
 }
 
 //=================================================================================
+pub struct CbUmiIterator {
+    busiter: BusIteratorBuffered,
+    last_record: Option<BusRecord>  //option needed to mark the final element of the iteration
+}
+
+impl CbUmiIterator {
+
+    pub fn new(fname: &String) ->CbUmiIterator{
+        let mut busiter = BusIteratorBuffered::new(fname);
+        let last_record = busiter.next(); //initilize with the first record in the file
+        CbUmiIterator {busiter, last_record}
+    }
+}
+
+impl Iterator for CbUmiIterator {
+    type Item = ((u64, u64), Vec<BusRecord>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+
+        println!("Calling next() in CbUmiIterator");
+        let mut busrecords: Vec<BusRecord> = Vec::new(); // storing the result to be emitted
+        
+        println!("Last record {:?}", self.last_record);
+        loop {
+            if let Some(last_record) = self.last_record{  //if we're not done with the iteration
+                // try to get a new record
+                if let Some(new_record) = self.busiter.next(){
+
+                    // determine if we encounter a new cell in this iteration
+                    let current_cb = last_record.CB;
+                    let current_umi = last_record.UMI;
+
+                    if new_record.CB > current_cb || (new_record.CB == current_cb &&  new_record.UMI > current_umi){  
+                        // we ran into a new CB/UMI and its records
+                        busrecords.push(last_record); // the stored element from the previous iteration
+                        println!("\tyielding {:?}", (current_cb, &busrecords));
+                        self.last_record = Some(new_record);
+
+                        return Some(((current_cb, current_umi), busrecords));
+                    }
+                    else if (new_record.CB == current_cb) && new_record.UMI == current_umi {
+                        busrecords.push(last_record);
+                        self.last_record = Some(new_record);
+
+                    }
+                    else{  // the new cb is smaller then the current state: this is a bug due to an UNOSORTED busfile
+                        panic!("Unsorted busfile: {}/{} -> {}/{}", current_cb, current_umi, new_record.CB, new_record.UMI)
+                    }
+                }
+                else {
+                    // we ran pas the last entry of the file
+                    // FINALize the last emit
+                    busrecords.push(last_record);
+                    let current_cb = last_record.CB;
+                    let current_umi = last_record.UMI;
+                    // to mark the end of iteration and all items emitted, set last_item to None
+                    self.last_record = None;
+                    return Some(((current_cb, current_umi), busrecords));  
+                }
+            }
+            else{  // last_record == None
+                // we are done
+                return None
+            }
+        }
+    }
+}
+
+//=================================================================================
 pub struct CellIterator {
     busiter: BusIteratorBuffered,
     last_record: Option<BusRecord>  //option needed to mark the final element of the iteration
@@ -215,7 +284,7 @@ impl Iterator for CellIterator {
 #[cfg(test)]
 mod tests {
     use std::io::Write;
-    use crate::bus::{BusRecord, BusHeader, CellIterator, BusIteratorBuffered, BusWriter};
+    use crate::bus::{BusRecord, BusHeader, CellIterator, BusIteratorBuffered, BusWriter, CbUmiIterator};
 
     fn setup_busfile(records: Vec<BusRecord>, busname: &String){
         let header = BusHeader::new(16, 12, 20);
@@ -273,11 +342,11 @@ mod tests {
         setup_busfile(records, &busname);
 
         let cb_iter = CellIterator::new(&busname);
-        let n: Vec<(u64, Vec<BusRecord>)> = cb_iter.collect();
+        let _n: Vec<(u64, Vec<BusRecord>)> = cb_iter.collect();
     }
 
     #[test]
-    fn test_iter(){   
+    fn test_cb_iter(){   
         let r1 = BusRecord{CB: 0, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
         let r2 = BusRecord{CB: 0, UMI: 21, EC: 1, COUNT: 2, FLAG: 0};
         let r3 = BusRecord{CB: 1, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
@@ -316,6 +385,50 @@ mod tests {
         // assert_eq!(n, vec![vec![r1,r2], vec![r3], vec![r4,r5]])
 
      }
+
+
+     #[test]
+     fn test_cbumi_iter(){   
+         let r1 = BusRecord{CB: 0, UMI: 1, EC: 0, COUNT: 12, FLAG: 0};
+         let r2 = BusRecord{CB: 0, UMI: 1, EC: 1, COUNT: 2, FLAG: 0};
+         let r3 = BusRecord{CB: 0, UMI: 2, EC: 0, COUNT: 12, FLAG: 0};
+         let r4 = BusRecord{CB: 1, UMI: 1, EC: 1, COUNT: 2, FLAG: 0};
+         let r5 = BusRecord{CB: 1, UMI: 2, EC: 1, COUNT: 2, FLAG: 0};
+         let r6 = BusRecord{CB: 2, UMI: 1, EC: 1, COUNT: 2, FLAG: 0};
+ 
+         let records = vec![r1,r2,r3,r4,r5, r6];
+ 
+         let busname = "/tmp/test_cbumi_iter.bus".to_string();
+         setup_busfile(records, &busname);
+ 
+ 
+         let cb_iter = CbUmiIterator::new(&busname);
+         // let n: Vec<Vec<BusRecord>> = cb_iter.map(|(_cb, rec)| rec).collect();
+         let n: Vec<((u64, u64), Vec<BusRecord>)> = cb_iter.collect();
+         println!("{:?}", n);
+ 
+         assert_eq!(n.len(), 5);
+         // println!("{:?}", n);
+         // println!("First");
+         let c1 = &n[0];
+         assert_eq!(*c1, ((0,1 ), vec![r1,r2]));
+ 
+         // println!("Second");
+         let c2 = &n[1];
+         assert_eq!(*c2, ((0, 2), vec![r3]));
+ 
+         // println!("Third");
+         let c3 = &n[2];
+         assert_eq!(*c3, ((1,1), vec![r4]));
+ 
+         let c4 = &n[3];
+         assert_eq!(*c4, ((1,2), vec![r5]));
+ 
+         let c5 = &n[4];
+         assert_eq!(*c5, ((2,1), vec![r6]));
+         // assert_eq!(n, vec![vec![r1,r2], vec![r3], vec![r4,r5]])
+ 
+      }
 
 }
 
