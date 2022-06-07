@@ -12,6 +12,7 @@ mod bus;
 mod bus_multi;
 // mod merger;
 mod busmerger;
+mod tso_error;
 mod cb_umi_per_cell;
 
 #[derive(Parser)]
@@ -33,7 +34,8 @@ enum MyCommand {
     cb_umi_sketch(FastqArgs),
     cb_umi_cell(BusArgs),
     cb_umi_cell_aggr(BusArgs),
-    busmerge(BusMergeArgs)
+    busmerge(BusMergeArgs),
+    tso_error(TSOArgs)
 }
 
 #[derive(Args)]
@@ -60,6 +62,12 @@ struct BusArgs{
     /// Max #entries to consider in the bus file
     #[clap(short = 'n', long= "nmax")] 
     nmax: usize
+}
+#[derive(Args)]
+struct TSOArgs{
+    /// List of fastq files
+    #[clap()]
+    fastq_list: Vec<String>,
 }
 
 #[derive(Args)]
@@ -109,6 +117,10 @@ fn main() {
             println!("Doing bus merging");
             busmerger::merge_busfiles_on_overlap(args.inbus1, args.inbus2, args.outbus1, args.outbus2)      
         }
+        MyCommand::tso_error(args) => {
+            println!("Doing TSO error");
+            tso_error::run(&args.fastq_list, cli.output)      
+        }        
     };
 
 
