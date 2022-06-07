@@ -44,11 +44,24 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
     for seq in my_iter{  // this will do the same _ separation
     // for seq in my_iter.take(top_x as usize){  // this will do the same _ separation
         bar.inc(1);
-        let hits = bk.find(seq.to_string(), 1);
-        if hits.len() > 0{
-            // we found something thats close to the TSO
-            let counter = counter.entry(seq).or_insert(0);
-            *counter += 1;
+
+        // using a BKtree
+        if true{
+            let hits = bk.find(seq.to_string(), 1);
+            if hits.len() > 0{
+                // we found something thats close to the TSO
+                let counter = counter.entry(seq).or_insert(0);
+                *counter += 1;
+            }
+        }
+        else{
+            let max_distance = TSO.iter().map(|tso| my_hamming(&tso, &seq.to_string())).min().unwrap();
+            if max_distance <=1{
+                // println!("{max_distance}");
+
+                let counter = counter.entry(seq).or_insert(0);
+                *counter += 1;
+            }
         }
     }
     bar.finish();

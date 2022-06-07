@@ -228,7 +228,8 @@ pub fn my_hamming(a: &String, b: &String) -> isize {
     // hamming distance for two strings of the same size
     assert_eq!(a.len(), b.len());
     let mut counter: isize = 0;
-    for (c1, c2) in  std::iter::zip((*a).chars(), (*b).chars()){  // todo: change to bytes, might be faster
+    // for (c1, c2) in  std::iter::zip((*a).chars(), (*b).chars()){  // todo: change to bytes, might be faster
+    for (c1, c2) in  std::iter::zip((*a).bytes(), (*b).bytes()){  // todo: change to bytes, might be faster
         if c1 != c2{
             counter +=1 ;
         }
