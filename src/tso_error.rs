@@ -42,7 +42,7 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
 
     // go over all records, see if anything is close to the TSO
     for seq in my_iter{  // this will do the same _ separation
-    // for seq in my_iter.take(top_x as usize){  // this will do the same _ separation
+    // for seq in my_iter.take(10000000 as usize){  // this will do the same _ separation
         bar.inc(1);
 
         // using a BKtree
@@ -57,7 +57,6 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
         else{
             let max_distance = TSO.iter().map(|tso| my_hamming(&tso, &seq.to_string())).min().unwrap();
             if max_distance <=1{
-                // println!("{max_distance}");
 
                 let counter = counter.entry(seq).or_insert(0);
                 *counter += 1;

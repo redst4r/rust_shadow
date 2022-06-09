@@ -17,6 +17,16 @@ fn main(){
 const POLYT_THRESHOLD: u32 = 9;
 const RECORD_SIZE_THRESHOLD: usize = 100;
 
+/// Estimate the UMI errors from a busfile
+/// 
+/// This will iterate by cell, estimating the errors from all UMIs in a particular cell
+/// until nmax UMIs have been processed
+/// 
+/// Doesnt look at the most frequent UMIs or anything, just the first nmax UMIs it encounters
+/// 
+/// The results are aggregated at a cell level, i.e. per cell, how many times was a UMI correct, how often was there an error at base1 etc..
+/// 
+/// 
 pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
     let cb_iter = CellIterator::new(&busfile);
@@ -84,6 +94,9 @@ fn bus_record_to_cbumi(r: &BusRecord) -> CbUmi{
     CbUmi {cb: int_to_seq(r.CB, 16), umi: int_to_seq(r.UMI, 12)}
 }
 
+/// For the BusRecords from a single cell, estimate the UMI errors for all records
+/// will return a dataframe with each row being a true molecules (with number of shadows per position)
+/// it'll be roughly the same size as bus_records.len() (minus the shadows)
 fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
 
     // sorting the records?! might make BKtrees faster
