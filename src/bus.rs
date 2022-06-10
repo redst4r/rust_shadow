@@ -1,12 +1,14 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::BufReader;
+use std::io::BufRead;
 use std::io::Write;
 use serde::{Serialize, Deserialize};
 use std::io::{Seek, SeekFrom};
 use bincode;
-
+use polars::prelude::*;
 
 const BUS_ENTRY_SIZE: usize = 32;
 const BUS_HEADER_SIZE: usize = 20;
@@ -275,6 +277,131 @@ impl Iterator for CellIterator {
         }
     }
 }
+
+//=================================================================================
+
+pub struct BusFolder {
+    pub foldername: String,
+    pub ec_dict: HashMap<u32, Vec<u32>>, // EC-> list of Transcript ids
+    pub transcript_dict: HashMap<u32, String>,  // transcript-id -> traqnscript name
+    pub transcript_to_gene: HashMap<String, String>,
+    pub ec2gene: HashMap<u32, Vec<String>>
+}
+
+
+#[test]
+fn dummy(){
+    let b= BusFolder::new(
+        // "/home/michi/mounts/TB4drive/ISB_data/LT_pilot/LT_pilot/kallisto_quant/Fresh1/kallisto/sort_bus/bus_output".to_string(),
+        // "/home/michi/mounts/TB4drive/kallisto_resources/transcripts_to_genes.txt".to_string()
+        "/home/michi/bus_output".to_string(),
+        "/home/michi/transcripts_to_genes.txt".to_string()
+    );
+
+    println!("{}", b.ec_dict.len());
+    println!("{:?}", b.ec_dict.get(&812069).unwrap());
+    println!("{:?}", b.ec2gene.get(&613).unwrap());
+    
+}
+
+impl BusFolder {
+    pub fn new(foldername: String, t2g_file:String) ->BusFolder{
+
+        // read EC dict
+        let file = File::open(format!("{}/{}", foldername, "matrix.ec")).unwrap();
+        let reader = BufReader::new(file);
+        let mut ec_dict: HashMap<u32, Vec<u32>> = HashMap::new();
+
+        println!("Reading EC.matrix");
+        for line in reader.lines(){
+            if let Ok(l) = line{
+                let mut s = l.split_whitespace();
+                let ec = s.next().unwrap().parse::<u32>().unwrap();
+                let tmp = s.next().unwrap();
+
+                let transcript_list: Vec<u32> = tmp
+                                                 .split(",")
+                                                 .map(|x|x.parse::<u32>().unwrap()).collect();
+                ec_dict.insert(ec, transcript_list);
+            }
+        }
+
+        // read transcript dict
+        println!("Reading transcripts.txt");
+
+        let file = File::open(format!("{}/{}", foldername, "transcripts.txt")).unwrap();
+        let reader = BufReader::new(file);
+        let mut transcript_dict: HashMap<u32, String> = HashMap::new();
+        for (i, line) in reader.lines().enumerate(){
+            if let Ok(l) = line{
+                transcript_dict.insert(i as u32, l);
+            }
+        }
+
+        // read transcript to gene file
+        println!("Reading t2g_dict");
+
+        let mut t2g_dict: HashMap<String, String> = HashMap::new();        
+        let file = File::open(t2g_file).unwrap();
+        let reader = BufReader::new(file);
+        for (i, line) in reader.lines().enumerate(){
+            if let Ok(l) = line{
+                let mut s = l.split_whitespace();
+                let transcript_id = s.next().unwrap();
+                s.next();
+                let symbol = s.next().unwrap();
+
+                assert!(!t2g_dict.contains_key(&transcript_id.to_string()));  //make sure transcripts dont map to multiple genes
+                t2g_dict.insert(transcript_id.to_string(), symbol.to_string());
+            }
+        }
+
+        // create the EC->gene mapping
+        println!("building EC->gene");
+
+        let mut ec2gene: HashMap<u32, Vec<String>> = HashMap::new();
+        for (ec, transcript_ints) in ec_dict.iter(){
+
+            let mut genes: Vec<String> = Vec::new();
+            for t_int in transcript_ints{
+                let t_name = transcript_dict.get(&t_int).unwrap();
+
+                // if we can resolve, put the genename, otherwsise use the transcript name instead
+                match t2g_dict.get(t_name){
+                    Some(genename) => genes.push(genename.clone()),
+                    None =>  genes.push(t_name.clone()),
+                }
+            }
+            ec2gene.insert(*ec, genes);
+        }
+
+
+        // let df =  CsvReader::from_path(t2g_file).unwrap()
+        //                                         .has_header(false)            
+        //                                         .infer_schema(None);
+        // let y = df.with_columns(Some(vec!["tid".to_string(),"gid".to_string(), "symbol".to_string()]));
+        // v.finish();
+        // let mut df = CsvReader::from_path(t2g_file).unwrap()
+        // // .with_n_threads(Some(1)) // comment for multithreading
+        // // .with_encoding(CsvEncoding::LossyUtf8)
+        // .has_header(true)
+        // .with_columns(Some(vec!["tid".to_string(),"gid".to_string(), "symbol".to_string()]))
+        // .finish().unwrap();
+        
+        // let x = df["tid"].zip(df["symbol"]);
+
+
+        
+        BusFolder{
+            foldername,
+            ec_dict,
+            transcript_dict,
+            transcript_to_gene: t2g_dict,
+            ec2gene
+        }
+    }
+}
+
 
 //=================================================================================
 #[cfg(test)]

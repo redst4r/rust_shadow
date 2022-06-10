@@ -14,6 +14,7 @@ mod bus_multi;
 mod busmerger;
 mod tso_error;
 mod cb_umi_per_cell;
+mod cb_umi_per_cell_gene;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -34,6 +35,7 @@ enum MyCommand {
     cb_umi_sketch(FastqArgs),
     cb_umi_cell(BusArgs),
     cb_umi_cell_aggr(BusArgs),
+    cb_umi_cell_gene(BusArgs2),
     busmerge(BusMergeArgs),
     tso_error(TSOArgs)
 }
@@ -63,6 +65,23 @@ struct BusArgs{
     #[clap(short = 'n', long= "nmax")] 
     nmax: usize
 }
+
+
+#[derive(Args)]
+struct BusArgs2{
+    /// Busfolder to read the CB/UMIs from
+    /// contains the busfile and ec.matrix, transcripts
+    #[clap()]
+    busfolder: String,
+
+    #[clap()]
+    t2gfile: String,
+    
+    /// Max #entries to consider in the bus file
+    #[clap(short = 'n', long= "nmax")] 
+    nmax: usize
+}
+
 #[derive(Args)]
 struct TSOArgs{
     /// List of fastq files
@@ -120,6 +139,10 @@ fn main() {
         MyCommand::tso_error(args) => {
             println!("Doing TSO error");
             tso_error::run(&args.fastq_list, cli.output)      
+        }              
+        MyCommand::cb_umi_cell_gene(args) => {
+            println!("Doing CUG error");
+            cb_umi_per_cell_gene::run(args.busfolder, &cli.output, args.nmax, false, args.t2gfile)      
         }        
     };
 
