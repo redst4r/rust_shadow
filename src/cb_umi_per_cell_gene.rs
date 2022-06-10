@@ -50,7 +50,7 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
     let mut number_of_umis_seen = 0;
     for records in cb_iter
         .map(|(_cb, rec)| rec)
-        .filter(|rec| rec.len()>RECORD_SIZE_THRESHOLD)
+        .filter(|rec| rec.len()>RECORD_SIZE_THRESHOLD)  // only consider cells with a certain number of records
         {
 
         let mut df_single_cell = do_single_cb(records, &ec2gene);
@@ -100,13 +100,9 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
     write_to_csv(&mut df.sum(), "/tmp/cb_sum.csv".to_string());
 }
 
-fn bus_record_to_cbumi(r: &BusRecord) -> CbUmi{
-    CbUmi {cb: int_to_seq(r.CB, 16), umi: int_to_seq(r.UMI, 12)}
-}
-
 fn bus_record_to_cbumigene(r: &BusRecord, ec2gene_dict: &HashMap<u32, Vec<String>>) -> Option<CbUmiGene>{
     // returns, but only if the record maps to a single gene!
-    let mut genes = ec2gene_dict.get(&(r.EC as u32)).unwrap();
+    let genes = ec2gene_dict.get(&(r.EC as u32)).expect(&format!("EC {} not found", r.EC));
 
     // genes.sort();
     //turn into a string
@@ -154,7 +150,6 @@ pub fn find_correct_umis_CUG(counter: &Counter<CbUmiGene, u32>) -> Vec<CbUmiGene
 
     for (CUG, _freq) in counter.most_common(){
 
-        let umi = CUG.umi.clone();
         let matches = bk.find(CUG.clone(), 1);
         if matches.len() == 0{
             correct_umis.push(CUG.clone());  // add it to the topN list
@@ -201,16 +196,24 @@ fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, Vec<String>>
 
     // count UMI frequencies
     let mut freq_map: Counter<CbUmiGene, u32> = Counter::new();
-
+    let mut n_unique_mapped = 0;
+    let mut n_not_unique_mapped = 0;
     for (cbumi, frequency) in bus_records.iter().map(|r| (bus_record_to_cbumigene(r, ec2gene), r.COUNT) ){
         if let Some(cbumigene) = cbumi{  
             // mapped to a single gene
             let c = freq_map.entry(cbumigene).or_insert(0);
             *c += frequency;
-        }
-        // otherwise ignore
 
+            n_unique_mapped += frequency;
+        }
+        else{
+            // otherwise ignore
+            n_not_unique_mapped += frequency;
+        }
     }
+
+    println!("Unique vs non-unique: {}/{}\t %unique = {}",n_unique_mapped, n_not_unique_mapped, (n_unique_mapped as f32)/(n_unique_mapped+n_not_unique_mapped) as f32);
+
     let correct_umis = find_correct_umis_CUG(&freq_map); 
 
     // find the shadows 
