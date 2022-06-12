@@ -1,11 +1,20 @@
 use std::collections::HashMap;
 use bktree::BkTree;
 use crate::bus::{CellIterator, BusRecord, BusFolder};
-use crate::utils::{int_to_seq, CbUmi, CbUmiGene, write_to_csv, sequence_composition};
+use crate::utils::{int_to_seq, CbUmi, CbUmiGene, write_to_csv, sequence_composition, all_mutations_for_cbumi};
 use counter::Counter;
 use polars::prelude::*;
-
 use indicatif::{ProgressBar, ProgressStyle};
+
+///
+/// Code for estimating UMI error-rate, taking into account the EC/gene 
+/// that UMIs map to to avoid collisions
+/// For example two bus-records XYZ-geneA and XYZ-geneB 
+/// will not be confused as the same molecule
+/// however XYZ-geneA and XYY-geneB will be considered shadows of each other
+///
+/// While the BusRecords contain only information about the EC, not the gene(s) a record maps
+/// we consider the potential genes instead of ECs
 
 #[cfg(test)]
 #[test]
@@ -13,7 +22,7 @@ fn main(){
     run(
         "/home/michi/bus_output".to_string(), 
         &"/tmp/cb.csv".to_string(),
-        1000, 
+        10000, 
         false,
         "/home/michi/transcripts_to_genes.txt".to_string() 
     )
@@ -31,6 +40,8 @@ const RECORD_SIZE_THRESHOLD: usize = 100;
 /// 
 /// The results are aggregated at a cell level, i.e. per cell, how many times was a UMI correct, how often was there an error at base1 etc..
 /// 
+/// busfolder: We need a folder containing matrix.ec, transcipts.txt and output.corrected.sort.bus
+/// t2gfile: filename which contains the mapping of transcript->gene
 /// 
 pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2gfile: String){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
@@ -88,7 +99,6 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
             bar.finish();
             break
         }
-
     }
     println!("final height{}", df.height());
 
@@ -96,8 +106,6 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
 
     // let fh = File::create("example.parquet").expect("could not create file");
     // ParquetWriter::new(fh).finish(&mut df);
-
-    write_to_csv(&mut df.sum(), "/tmp/cb_sum.csv".to_string());
 }
 
 fn bus_record_to_cbumigene(r: &BusRecord, ec2gene_dict: &HashMap<u32, Vec<String>>) -> Option<CbUmiGene>{
@@ -117,25 +125,23 @@ fn bus_record_to_cbumigene(r: &BusRecord, ec2gene_dict: &HashMap<u32, Vec<String
     else{
         None
     }
-
 }
 
-pub fn my_hamming_CUG_umigene_compare(a: &CbUmiGene, b: &CbUmiGene) -> isize {
+pub fn my_hamming_cug_umigene_compare(a: &CbUmiGene, b: &CbUmiGene) -> isize {
     // hamming distance for two CUGs, but only checkign the UMI errors
     // CB and gene have to match!!
 
     if a.cb != b.cb{
+        panic!("{}!={} should never happen. ", a.cb, b.cb);
         return 1000;
     }
     if a.gene != b.gene{
         return 1000;
     }
 
-
     assert_eq!(a.umi.len(), b.umi.len());
     let mut counter: isize = 0;
-    // for (c1, c2) in  std::iter::zip((*a).chars(), (*b).chars()){  // todo: change to bytes, might be faster
-    for (c1, c2) in  std::iter::zip((*a.umi).bytes(), (*b.umi).bytes()){  // todo: change to bytes, might be faster
+    for (c1, c2) in  std::iter::zip((*a.umi).bytes(), (*b.umi).bytes()){
         if c1 != c2{
             counter +=1 ;
         }
@@ -143,25 +149,23 @@ pub fn my_hamming_CUG_umigene_compare(a: &CbUmiGene, b: &CbUmiGene) -> isize {
     counter
 }
 
-pub fn find_correct_umis_CUG(counter: &Counter<CbUmiGene, u32>) -> Vec<CbUmiGene>{
+pub fn find_correct_umis_cug(counter: &Counter<CbUmiGene, u32>) -> Vec<CbUmiGene>{
 
-    let mut bk: BkTree<CbUmiGene> = BkTree::new(my_hamming_CUG_umigene_compare);
+    let mut bk: BkTree<CbUmiGene> = BkTree::new(my_hamming_cug_umigene_compare);
     let mut correct_umis: Vec<CbUmiGene> = Vec::new();
 
-    for (CUG, _freq) in counter.most_common(){
-
-        let matches = bk.find(CUG.clone(), 1);
+    for (cug, _freq) in counter.most_common(){
+        let matches = bk.find(cug.clone(), 1);
         if matches.len() == 0{
-            correct_umis.push(CUG.clone());  // add it to the topN list
+            correct_umis.push(cug.clone());  // add it to the topN list
         }
-        bk.insert(CUG);
+        bk.insert(cug);
     }
     correct_umis
 }
 
-use crate::utils::all_mutations_for_cbumi;
 
-pub fn find_shadows_CUG(cug: CbUmiGene, filtered_map: &Counter<CbUmiGene, u32>) -> HashMap<usize, u32>{
+pub fn find_shadows_cug(cug: CbUmiGene, filtered_map: &Counter<CbUmiGene, u32>) -> HashMap<usize, u32>{
     // for a given "true" CB/UMI find the number of shadowed reads (i.e. reads with a single subsitution)
     // and count their number (position specific)
     // we get a dcitionary with position -> #shadow reads
@@ -191,9 +195,6 @@ pub fn find_shadows_CUG(cug: CbUmiGene, filtered_map: &Counter<CbUmiGene, u32>) 
 /// it'll be roughly the same size as bus_records.len() (minus the shadows)
 fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, Vec<String>>) -> DataFrame{
 
-    // sorting the records?! might make BKtrees faster
-    // records.sort_by(|a, b| b.UMI.cmp(&a.UMI));
-
     // count UMI frequencies
     let mut freq_map: Counter<CbUmiGene, u32> = Counter::new();
     let mut n_unique_mapped = 0;
@@ -212,9 +213,11 @@ fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, Vec<String>>
         }
     }
 
-    println!("Unique vs non-unique: {}/{}\t %unique = {}",n_unique_mapped, n_not_unique_mapped, (n_unique_mapped as f32)/(n_unique_mapped+n_not_unique_mapped) as f32);
+    // println!("Unique vs non-unique: {}/{}\t %unique = {}",n_unique_mapped, n_not_unique_mapped, (n_unique_mapped as f32)/(n_unique_mapped+n_not_unique_mapped) as f32);
 
-    let correct_umis = find_correct_umis_CUG(&freq_map); 
+    let correct_umis = find_correct_umis_cug(&freq_map); 
+
+    // println!("correct UMIS: {}", correct_umis.len());
 
     // find the shadows 
     let mut polars_data: HashMap<String, Vec<u32>> = HashMap::new();
@@ -228,7 +231,7 @@ fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, Vec<String>>
 
     for cug in correct_umis{
         let cug2 = cug.clone();
-        let nshadows_per_position = find_shadows_CUG(cug, &freq_map);
+        let nshadows_per_position = find_shadows_cug(cug, &freq_map);
 
         let mut total_shadows = 0; // the total shadows (sum over positions) for this one CB/UMI
         for (position, n_shadows) in nshadows_per_position.iter(){
