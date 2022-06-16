@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use bktree::BkTree;
 use crate::bus::{CellIterator, BusRecord};
-use crate::utils::{int_to_seq, CbUmi, write_to_csv, my_hamming, seq_to_int};
+use crate::utils::{int_to_seq, CbUmi, write_to_csv, my_hamming, seq_to_int, sequence_composition};
 use counter::Counter;
 use crate::cb_umi_errors::find_shadows;
 use polars::prelude::*;
@@ -11,7 +11,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 #[cfg(test)]
 #[test]
 fn main(){
-    run(&"/home/michi/output.corrected.sort.bus".to_string(), &"/tmp/cb.csv".to_string(), 1000, true)
+    run(&"/home/michi/bus_output/output.corrected.sort.bus".to_string(),
+    &"/tmp/cb2.csv".to_string(),
+    1000,
+    false)
 }
 
 const POLYT_THRESHOLD: u32 = 9;
@@ -175,27 +178,6 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
     df_final
 
 }
-
-fn sequence_composition(s: &String) -> (u32, u32,u32,u32){
-    let mut counter_a = 0;
-    let mut counter_c = 0;
-    let mut counter_g = 0;
-    let mut counter_t = 0;
-
-    for c in s.chars(){
-        match c{
-            'A' => counter_a+=1,
-            'C' => counter_c+=1,
-            'G' => counter_g+=1,
-            'T' => counter_t+=1,
-            _ => panic!("Unknown char {}", c)
-        }
-    }
-
-    return (counter_a, counter_c, counter_g, counter_t)
-
-}
-
 
 pub fn find_correct_umis(counter: &Counter<CbUmi, u32>) -> Vec<CbUmi>{
 

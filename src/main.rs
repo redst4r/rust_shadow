@@ -15,6 +15,7 @@ mod busmerger;
 mod tso_error;
 mod cb_umi_per_cell;
 mod phred_counter;
+mod cb_umi_per_cell_gene;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -34,7 +35,7 @@ enum MyCommand {
     cb_umi_exact(FastqArgs),
     cb_umi_sketch(FastqArgs),
     cb_umi_cell(BusArgs),
-    cb_umi_cell_aggr(BusArgs),
+    cb_umi_cell_gene(BusArgs2),
     busmerge(BusMergeArgs),
     tso_error(TSOArgs),
     phred(PhredArgs)
@@ -65,13 +66,39 @@ struct FastqArgs{
 #[derive(Args)]
 struct BusArgs{
     /// Busfile to read the CB/UMIs from
-    #[clap()]
+    #[clap(long= "busfile")] 
     busfile: String,
     
     /// Max #entries to consider in the bus file
     #[clap(short = 'n', long= "nmax")] 
+    nmax: usize,
+
+    /// whether to aggregate the entries on a cell level (one row per cell), or ouput one row per UMI
+    #[clap(long= "aggr")] 
+    aggregate: bool,
+}
+
+
+#[derive(Args)]
+struct BusArgs2{
+    /// Busfolder to read the CB/UMIs from
+    /// contains the busfile and ec.matrix, transcripts
+    #[clap(long= "busfolder")] 
+    busfolder: String,
+
+    /// transcript to gene filename
+    #[clap(long= "t2g")] 
+    t2gfile: String,
+    
+    /// whether to aggregate the entries on a cell level (one row per cell), or ouput one row per UMI
+    #[clap(long= "aggr")] 
+    aggregate: bool,
+
+    /// Max #entries to consider in the bus file
+    #[clap(short = 'n', long= "nmax")] 
     nmax: usize
 }
+
 #[derive(Args)]
 struct TSOArgs{
     /// List of fastq files
@@ -92,11 +119,7 @@ struct BusMergeArgs{
     outbus2: String,  
 }
 
-fn main() {
-    // myfastq::run();
-    // sqlite::run();
-    // hset::run();
-    
+fn main() {   
     let cli = Cli::parse();
 
     match cli.command{
@@ -116,11 +139,7 @@ fn main() {
         },
         MyCommand::cb_umi_cell(args) => {
             println!("Doing CB_UMI via single cells");
-            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax, false)  
-        }
-        MyCommand::cb_umi_cell_aggr(args) => {
-            println!("Doing AGGREGATE CB_UMI via single cells");
-            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax, true)
+            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax, args.aggregate)  
         }
         MyCommand::busmerge(args) => {
             println!("Doing bus merging");
@@ -134,37 +153,11 @@ fn main() {
             println!("Doing CUG error");
             phred_counter::run(&args.fastq_list, cli.output)      
         }                   
+        MyCommand::cb_umi_cell_gene(args) => {
+            println!("Doing CUG error");
+            cb_umi_per_cell_gene::run(args.busfolder, &cli.output, args.nmax, args.aggregate, args.t2gfile)      
+        }        
     };
-
-
-    // println!("Whitelist {:?}",cli.whitelist);
-    // println!("Output {:?}",cli.output);
-    // println!("Top N {:?}",cli.topn);
-    // println!("FASTQ {:?}",cli.fastq_list);
-
-    // cb_umi_sketch::run_topN(&cli.fastq_list, cli.whitelist, cli.output, topn);
-    // cb_umi_errors::run(&cli.fastq_list, cli.whitelist, "/tmp/full_out.csv".to_string(), topn);
-
-
-
-    // let args: Vec<String> = env::args().collect();
-    // let fastq_list = &args[1..];
-
-    // let fastq_file: String = "/home/michi/r1.fastq.gz".into();
-    // let fastq_file1: String = "/home/michi/01_Day2_GE_S1_L001_R1_001.fastq.gz".into();
-    // let fastq_file: String = "/home/michi/Virus_barcode_CKDL220009934-1a_HN2MJDSX3_L3_1.fq.gz".into();
-    // let whitelist_file: String = "/home/michi/3M-february-2018.txt.gz".into();
-    // let fastq_list = vec![fastq_file1];
-
-    // let whitelist_file: String = "/home/michi/mounts/TB4drive/kallisto_resources/3M-february-2018.txt.gz".into();
-    // let fastq_file1: String = "/home/michi/mounts/TB4drive/ISB_data/LT_pilot/LT_pilot/raw_data/Fresh1/Fresh1_CKDL210025651-1a-SI_TT_C2_HVWMHDSX2_S2_L001_R1_001.fastq.gz".into();
-    // let fastq_list = vec![fastq_file1];
-
-    // /home/michi/.cargo/bin/cargo run --release -- -w /home/michi/mounts/TB4drive/kallisto_resources/3M-february-2018.txt.gz --ntop 10000 --output /tmp/cb_only.csv --command cb /home/michi/mounts/TB4drive/ISB_data/LT_pilot/LT_pilot/raw_data/Fresh1/Fresh1_CKDL210025651-1a-SI_TT_C2_HVWMHDSX2_S2_L001_R1_001.fastq.gz
-
-
-
-    // let whitelist_file: String = "/home/mstrasse/TB4/resources/3M-february-2018.txt.gz".into();
 }
 
 

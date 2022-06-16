@@ -107,6 +107,30 @@ impl CbUmi {
 }
 
 
+#[derive(Hash, PartialEq, Eq, Clone)]
+pub struct CbUmiGene{
+    pub cb: String,
+    pub umi: String,
+    pub gene: String
+}
+impl CbUmiGene {
+    pub fn to_string(&self) -> String{
+        format!("{}_{}_{}", self.cb, self.umi, self.gene)
+    }
+    pub fn from_string(s:&String) -> CbUmiGene{
+        let mut split = s.split('_');
+        let cb = split.next().expect(s);
+        let umi = split.next().expect(s);
+        let gene = split.next().expect(s);
+        CbUmiGene {
+            cb: cb.to_string(), 
+            umi: umi.to_string(),
+            gene: gene.to_string()
+        }
+    } 
+}
+
+
 pub fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
     // return the three 1BP mutations of a sequence at the given position"
     let mut mutation = Vec::with_capacity(3);
@@ -253,6 +277,27 @@ pub fn my_hamming(a: &String, b: &String) -> isize {
         }
     };
     counter
+}
+
+
+pub fn sequence_composition(s: &String) -> (u32, u32,u32,u32){
+    let mut counter_a = 0;
+    let mut counter_c = 0;
+    let mut counter_g = 0;
+    let mut counter_t = 0;
+
+    for c in s.chars(){
+        match c{
+            'A' => counter_a+=1,
+            'C' => counter_c+=1,
+            'G' => counter_g+=1,
+            'T' => counter_t+=1,
+            _ => panic!("Unknown char {}", c)
+        }
+    }
+
+    return (counter_a, counter_c, counter_g, counter_t)
+
 }
 
 #[cfg(test)]
