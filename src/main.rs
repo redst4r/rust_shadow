@@ -14,6 +14,7 @@ mod bus_multi;
 mod busmerger;
 mod tso_error;
 mod cb_umi_per_cell;
+mod phred_counter;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -35,7 +36,15 @@ enum MyCommand {
     cb_umi_cell(BusArgs),
     cb_umi_cell_aggr(BusArgs),
     busmerge(BusMergeArgs),
-    tso_error(TSOArgs)
+    tso_error(TSOArgs),
+    phred(PhredArgs)
+}
+
+#[derive(Args)]
+struct PhredArgs{
+    /// List of fastq files
+    #[clap()]
+    fastq_list: Vec<String>,
 }
 
 #[derive(Args)]
@@ -119,8 +128,12 @@ fn main() {
         }
         MyCommand::tso_error(args) => {
             println!("Doing TSO error");
-            tso_error::run(&args.fastq_list, cli.output)      
-        }        
+            tso_error::run(&args.fastq_list, cli.output)     
+        } 
+        MyCommand::phred(args) => {
+            println!("Doing CUG error");
+            phred_counter::run(&args.fastq_list, cli.output)      
+        }                   
     };
 
 
