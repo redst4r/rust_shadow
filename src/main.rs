@@ -7,11 +7,8 @@ mod cb_errors;
 mod utils;
 // mod sketching;
 
+use rustbustools::busmerger;
 use clap::{self, Parser, Subcommand, Args};
-mod bus;
-mod bus_multi;
-// mod merger;
-mod busmerger;
 mod tso_error;
 mod cb_umi_per_cell;
 mod phred_counter;
@@ -159,6 +156,4 @@ fn main() {
         }        
     };
 }
-
-
 

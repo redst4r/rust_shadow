@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use bktree::BkTree;
-use crate::bus::{CellIterator, BusRecord, BusFolder};
-use crate::utils::{int_to_seq, CbUmi, CbUmiGene, write_to_csv, sequence_composition, all_mutations_for_cbumi};
+use rustbustools::io::{CellIterator, BusRecord, BusFolder};
+use crate::utils::{CbUmi, CbUmiGene, write_to_csv, sequence_composition, all_mutations_for_cbumi};
+use rustbustools::utils::int_to_seq;
 use counter::Counter;
 use polars::prelude::*;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -133,7 +134,6 @@ pub fn my_hamming_cug_umigene_compare(a: &CbUmiGene, b: &CbUmiGene) -> isize {
 
     if a.cb != b.cb{
         panic!("{}!={} should never happen. ", a.cb, b.cb);
-        return 1000;
     }
     if a.gene != b.gene{
         return 1000;
@@ -197,19 +197,19 @@ fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, Vec<String>>
 
     // count UMI frequencies
     let mut freq_map: Counter<CbUmiGene, u32> = Counter::new();
-    let mut n_unique_mapped = 0;
-    let mut n_not_unique_mapped = 0;
+    let mut _n_unique_mapped = 0;
+    let mut _n_not_unique_mapped = 0;
     for (cbumi, frequency) in bus_records.iter().map(|r| (bus_record_to_cbumigene(r, ec2gene), r.COUNT) ){
         if let Some(cbumigene) = cbumi{  
             // mapped to a single gene
             let c = freq_map.entry(cbumigene).or_insert(0);
             *c += frequency;
 
-            n_unique_mapped += frequency;
+            _n_unique_mapped += frequency;
         }
         else{
             // otherwise ignore
-            n_not_unique_mapped += frequency;
+            _n_not_unique_mapped += frequency;
         }
     }
 

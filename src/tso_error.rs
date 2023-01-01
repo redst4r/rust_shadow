@@ -1,6 +1,5 @@
 /// esimating the error fromth TSO
 /// 
-
 use std::collections::HashMap;
 use counter::Counter;
 use bktree::BkTree;

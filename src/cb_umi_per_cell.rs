@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use bktree::BkTree;
-use crate::bus::{CellIterator, BusRecord};
-use crate::utils::{int_to_seq, CbUmi, write_to_csv, my_hamming, seq_to_int, sequence_composition};
+use rustbustools::io::{CellIterator, BusRecord};
+use crate::utils::{CbUmi, write_to_csv, my_hamming, sequence_composition};
+use rustbustools::utils::int_to_seq;
+
 use counter::Counter;
 use crate::cb_umi_errors::find_shadows;
 use polars::prelude::*;
