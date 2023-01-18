@@ -1,11 +1,14 @@
-// mod myfastq;
-// mod sqlite;
-// mod hset;
 mod cb_umi_errors;
 mod cb_umi_sketch;
 mod cb_errors;
 mod utils;
 // mod sketching;
+
+// use std::collections::HashMap;
+
+use std::io::Write;
+use std::fs::File;
+use std::time::Instant;
 
 use rustbustools::busmerger;
 use clap::{self, Parser, Subcommand, Args};
@@ -35,7 +38,15 @@ enum MyCommand {
     cb_umi_cell_gene(BusArgs2),
     busmerge(BusMergeArgs),
     tso_error(TSOArgs),
-    phred(PhredArgs)
+    phred(PhredArgs),
+    count(CountArgs)
+}
+
+#[derive(Args)]
+struct CountArgs{
+    /// List of fastq files
+    #[clap()]
+    fastq_list: Vec<String>,
 }
 
 #[derive(Args)]
@@ -153,7 +164,29 @@ fn main() {
         MyCommand::cb_umi_cell_gene(args) => {
             println!("Doing CUG error");
             cb_umi_per_cell_gene::run(args.busfolder, &cli.output, args.nmax, args.aggregate, args.t2gfile)      
-        }        
+        }    
+        MyCommand::count(args) => {
+            println!("Doing counting");
+            let mut file_handle = File::create(cli.output).unwrap();
+
+            for filename in args.fastq_list{
+                println!("Counting {}", filename.clone());
+
+                let now = Instant::now();
+                let c = count_fastq_reads(filename.clone());
+                let elapsed_time = now.elapsed();
+                println!("Counted {}, took {} minutes.", filename.clone(), elapsed_time.as_secs()/60);                
+
+                // write result to filen
+                file_handle.write(format!("{}\t{}\n", filename, c).as_bytes()).unwrap();
+            }
+        }
     };
 }
 
+
+pub fn count_fastq_reads(filename: String) -> usize{
+    // count the nubmer of entries (not lines!) in the fastq
+    let count = utils::fastq_iter_bare(&vec![filename], 1).count();
+    return count
+}

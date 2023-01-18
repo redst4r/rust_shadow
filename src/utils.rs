@@ -6,7 +6,17 @@ use polars::prelude::{CsvWriter, DataFrame, SerWriter};
 use std::fs::File;
 use core::hash::Hash;
 
-pub fn fastq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
+
+pub fn fastq_iter_bare(fastq_list: &Vec<String>, line: usize) -> impl Iterator<Item=String> + '_ {
+    // iterates over the concatenation of fastq files specified
+    // each fastq entry is four lines, we only pick out a specific one using the
+    // line arg:  
+    // line==0 -> header
+    // line==1 -> fastq seq
+    // line==2 -> sep
+    // line==3 -> phred
+    assert_eq!(line, 1); // currently hardcoded due to closure/borrow issues
+
     let file_iterators = fastq_list.into_iter()
         .map(|fname|{
             let decoder = bgzf::Reader::from_path(fname).unwrap();
@@ -14,14 +24,38 @@ pub fn fastq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
             let my_iter = reader.lines()
                 .enumerate().filter(|x| x.0 % 4 == 1)
                 .map(|x| x.1)
-                .filter_map(|line| line.ok()) //takes care of errors in file reading
-                .filter_map(|line| parse_r1_struct(line));
+                .filter_map(|line| line.ok()); //takes care of errors in file reading
             my_iter
         }
         );
     // chaining, flatmapping all the iterators into a single one
     let my_iter = file_iterators.flat_map(|x| x);
     my_iter
+}
+
+
+pub fn fastq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
+
+    // // iterates over the concatenation of fastq files specified, turning things into CB/UMI
+    // let file_iterators = fastq_list.into_iter()
+    //     .map(|fname|{
+    //         let decoder = bgzf::Reader::from_path(fname).unwrap();
+    //         let reader = BufReader::new(decoder);
+    //         let my_iter = reader.lines()
+    //             .enumerate().filter(|x| x.0 % 4 == 1)
+    //             .map(|x| x.1)
+    //             .filter_map(|line| line.ok()) //takes care of errors in file reading
+    //             .filter_map(|line| parse_r1_struct(line));
+    //         my_iter
+    //     }
+    //     );
+    // // chaining, flatmapping all the iterators into a single one
+    // let my_iter = file_iterators.flat_map(|x| x);
+    // my_iter
+    
+    let my_iter = fastq_iter_bare(fastq_list, 1).filter_map(|line| parse_r1_struct(line));
+    my_iter
+    
 }
 
 ///
@@ -57,19 +91,6 @@ pub fn parse_whitelist_gz(fname: &String) -> HashSet<String>{
     }
     hset
 }
-
-// pub fn parse_r1(seq: String) -> Option<(String, String)>{
-//     // TODO: size check
-//     // if seq.len() == 16 + 12{
-//         let cb = (&seq[0..16]).into();
-//         let umi = (&seq[16..28]).into();
-//         Some((cb, umi))
-//     // }
-//     // else
-//     // {
-//         // None
-//     // }
-// }
 
 
 pub fn parse_r1_struct(seq: String) -> Option<CbUmi>{
