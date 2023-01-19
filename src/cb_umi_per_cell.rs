@@ -13,7 +13,8 @@ use indicatif::{ProgressBar, ProgressStyle};
 #[cfg(test)]
 #[test]
 fn main(){
-    run(&"/home/michi/bus_output/output.corrected.sort.bus".to_string(),
+    use crate::test_files::TEST_BUSFILE;
+    run(&TEST_BUSFILE.to_string(),
     &"/tmp/cb2.csv".to_string(),
     1000,
     false)

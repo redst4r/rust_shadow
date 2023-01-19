@@ -7,7 +7,8 @@ use indicatif::{ProgressBar, ProgressStyle, };
 #[cfg(test)]
 #[test]
 fn main(){
-    run(&vec!["/home/michi/01_Day2_GE_S1_L001_R1_001.fastq.gz".to_string()],
+    use crate::test_files::TEST_FASTQ_R1;
+    run(&vec![TEST_FASTQ_R1.to_string()],
     "/tmp/phred.csv".to_string(),
 )
 }

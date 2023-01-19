@@ -11,7 +11,8 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 #[test]
 fn testing(){
-    let s = vec!["/home/michi/01_Day2_GE_S1_L001_R1_001.fastq.gz".to_string()];
+    use crate::test_files::TEST_FASTQ_R1;
+    let s = vec![TEST_FASTQ_R1.to_string()];
     run(&s, "/tmp/tso.csv".to_string());
 }
 
@@ -22,12 +23,12 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
     let tso2 = "AGCAGTGGTATCAACG_CAGAGTACATGG".to_string();
     let tso3 = "GCAGTGGTATCAACGC_AGAGTACATGGG".to_string();
     let tso4 = "CAGTGGTATCAACGCA_GAGTACATGGGG".to_string();
-    let TSO = vec![tso1, tso2, tso3, tso4];
+    let tso_list = vec![tso1, tso2, tso3, tso4];
     let my_iter = fastq_iter(fast_files);
     let mut counter: Counter<CbUmi, u32> = Counter::new();
 
     let mut bk: BkTree<String> = BkTree::new(my_hamming);
-    for seq in TSO.iter(){
+    for seq in tso_list.iter(){
         bk.insert(seq.clone())
     }
 
@@ -54,7 +55,7 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
             }
         }
         else{
-            let max_distance = TSO.iter().map(|tso| my_hamming(&tso, &seq.to_string())).min().unwrap();
+            let max_distance = tso_list.iter().map(|tso| my_hamming(&tso, &seq.to_string())).min().unwrap();
             if max_distance <=1{
 
                 let counter = counter.entry(seq).or_insert(0);
@@ -71,7 +72,7 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
     let mut cellnames: Vec<String> = Vec::new();
     let mut umis: Vec<String> = Vec::new();
 
-    for mc in TSO.into_iter().map(|c| CbUmi::from_string(&c)){
+    for mc in tso_list.into_iter().map(|c| CbUmi::from_string(&c)){
 
         if !counter.contains_key(&mc){
             continue

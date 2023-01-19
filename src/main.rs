@@ -2,6 +2,7 @@ mod cb_umi_errors;
 mod cb_umi_sketch;
 mod cb_errors;
 mod utils;
+mod test_files;
 // mod sketching;
 
 // use std::collections::HashMap;

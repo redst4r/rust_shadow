@@ -16,16 +16,16 @@ use indicatif::{ProgressBar, ProgressStyle};
 ///
 /// While the BusRecords contain only information about the EC, not the gene(s) a record maps
 /// we consider the potential genes instead of ECs
-
 #[cfg(test)]
 #[test]
 fn main(){
+    use crate::test_files::{TEST_BUSFOLDER, TEST_T2G};
     run(
-        "/home/michi/bus_output".to_string(), 
+        TEST_BUSFOLDER.to_string(), 
         &"/tmp/cb.csv".to_string(),
         10000, 
         false,
-        "/home/michi/transcripts_to_genes.txt".to_string() 
+        TEST_T2G.to_string() 
     )
 }
 
