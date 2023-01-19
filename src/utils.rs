@@ -15,15 +15,15 @@ pub fn fastq_iter_bare(fastq_list: &Vec<String>, line: usize) -> impl Iterator<I
     // line==1 -> fastq seq
     // line==2 -> sep
     // line==3 -> phred
-    assert_eq!(line, 1); // currently hardcoded due to closure/borrow issues
 
     let file_iterators = fastq_list.into_iter()
-        .map(|fname|{
+        .map(move |fname|{
             let decoder = bgzf::Reader::from_path(fname).unwrap();
             let reader = BufReader::new(decoder);
+            let line_tmp = line.clone();
             let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 1)
-                .map(|x| x.1)
+                .enumerate().filter( move |(line_id, _)| line_id % 4 == line_tmp)
+                .map(|(_, res)| res)
                 .filter_map(|line| line.ok()); //takes care of errors in file reading
             my_iter
         }
@@ -35,45 +35,14 @@ pub fn fastq_iter_bare(fastq_list: &Vec<String>, line: usize) -> impl Iterator<I
 
 
 pub fn fastq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
-
-    // // iterates over the concatenation of fastq files specified, turning things into CB/UMI
-    // let file_iterators = fastq_list.into_iter()
-    //     .map(|fname|{
-    //         let decoder = bgzf::Reader::from_path(fname).unwrap();
-    //         let reader = BufReader::new(decoder);
-    //         let my_iter = reader.lines()
-    //             .enumerate().filter(|x| x.0 % 4 == 1)
-    //             .map(|x| x.1)
-    //             .filter_map(|line| line.ok()) //takes care of errors in file reading
-    //             .filter_map(|line| parse_r1_struct(line));
-    //         my_iter
-    //     }
-    //     );
-    // // chaining, flatmapping all the iterators into a single one
-    // let my_iter = file_iterators.flat_map(|x| x);
-    // my_iter
-    
+    // iterates the sequences of the the fast files
     let my_iter = fastq_iter_bare(fastq_list, 1).filter_map(|line| parse_r1_struct(line));
     my_iter
-    
 }
 
-///
-/// instead if yielding the sequence, this one yields the PHRED ASCII scores of the reads
 pub fn phred_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=String> + '_ {
-    let file_iterators = fastq_list.into_iter()
-        .map(|fname|{
-            let decoder = bgzf::Reader::from_path(fname).unwrap();
-            let reader = BufReader::new(decoder);
-            let my_iter = reader.lines()
-                .enumerate().filter(|x| x.0 % 4 == 3)
-                .map(|x| x.1)
-                .filter_map(|line| line.ok()); //takes care of errors in file reading
-            my_iter
-        }
-        );
-    // chaining, flatmapping all the iterators into a single one
-    let my_iter = file_iterators.flat_map(|x| x);
+    // instead if yielding the sequence, this one yields the PHRED ASCII scores of the reads
+    let my_iter = fastq_iter_bare(fastq_list, 3);
     my_iter
 }
 
