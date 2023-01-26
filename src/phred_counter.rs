@@ -1,6 +1,7 @@
 use counter::Counter;
-use crate::utils::{write_to_csv, phred_iter};
+use crate::utils::{write_to_csv, };
 use polars::prelude::*;
+use crate::io::phred_iter;
 use indicatif::{ProgressBar, ProgressStyle, };
 
 

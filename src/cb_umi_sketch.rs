@@ -13,7 +13,8 @@
 //
 use counter::Counter;
 use std::collections::HashMap;
-use crate::utils::{write_to_csv, parse_whitelist_gz, all_mutations_for_cbumi, fastq_iter, CbUmi} ;
+use crate::utils::{write_to_csv, all_mutations_for_cbumi, CbUmi} ;
+use crate::io::{parse_whitelist_gz,fastq_iter};
 // use crate::sketching::GreaterThan1Bloom;
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};

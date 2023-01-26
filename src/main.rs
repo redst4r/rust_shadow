@@ -1,8 +1,4 @@
-mod cb_umi_errors;
-mod cb_umi_sketch;
-mod cb_errors;
-mod utils;
-mod test_files;
+
 // mod sketching;
 
 // use std::collections::HashMap;
@@ -13,10 +9,17 @@ use std::time::Instant;
 
 use rustbustools::busmerger;
 use clap::{self, Parser, Subcommand, Args};
-mod tso_error;
-mod cb_umi_per_cell;
-mod phred_counter;
-mod cb_umi_per_cell_gene;
+// mod tso_error;
+// mod cb_umi_per_cell;
+// mod phred_counter;
+// mod cb_umi_per_cell_gene;
+// mod cb_umi_errors;
+// mod cb_umi_sketch;
+// mod cb_errors;
+// mod utils;
+// mod test_files;
+
+use rustfastq::{io, cb_errors, cb_umi_errors, cb_umi_sketch, cb_umi_per_cell, phred_counter, tso_error, cb_umi_per_cell_gene};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -159,7 +162,7 @@ fn main() {
             tso_error::run(&args.fastq_list, cli.output)     
         } 
         MyCommand::phred(args) => {
-            println!("Doing CUG error");
+            println!("Doing Phred Counter");
             phred_counter::run(&args.fastq_list, cli.output)      
         }                   
         MyCommand::cb_umi_cell_gene(args) => {
@@ -188,6 +191,6 @@ fn main() {
 
 pub fn count_fastq_reads(filename: String) -> usize{
     // count the nubmer of entries (not lines!) in the fastq
-    let count = utils::fastq_iter_bare(&vec![filename], 1).count();
+    let count = rustfastq::io::fastq_iter_bare(&vec![filename], 1).count();
     return count
 }

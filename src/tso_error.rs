@@ -3,7 +3,8 @@
 use std::collections::HashMap;
 use counter::Counter;
 use bktree::BkTree;
-use crate::utils::{write_to_csv, fastq_iter, my_hamming, CbUmi};
+use crate::utils::{write_to_csv, my_hamming, CbUmi};
+use crate::io::fastq_iter;
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::cb_umi_errors::find_shadows;
 use indicatif::{ProgressBar, ProgressStyle};

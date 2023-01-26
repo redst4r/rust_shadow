@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use counter::Counter;
 use bktree::BkTree;
 use polars::prelude::{DataFrame, NamedFrom, Series};
-use crate::utils::{parse_whitelist_gz, write_to_csv, all_mutations_for_cbumi, CbUmi, fastq_iter, my_hamming};
+use crate::utils::{write_to_csv, all_mutations_for_cbumi, CbUmi, my_hamming};
+use crate::io::{parse_whitelist_gz,fastq_iter};
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<CbUmi, u32> {
     // coutns the CB/UMI pairs in the fastq
