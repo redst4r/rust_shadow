@@ -21,4 +21,4 @@ polars = {version = "0.21", features =["parquet", "lazy"]}
 streaming_algorithms = "*"
 indicatif = "0.16"
 clap = { version = "3.1.18", features = ["derive"] }
-rustbustools = { path = "/home/michi/Dropbox/rustbustools" }
+# rustbustools = { path = "/home/michi/Dropbox/rustbustools" }
