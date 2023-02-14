@@ -7,9 +7,16 @@ use crate::utils::CbUmi;
 use crate::utils::parse_r1_struct;
 
 
-pub fn fast_iter(fastqname: &str, line: usize) -> impl Iterator<Item=String> + '_  {
+pub fn fastq_iter(fastqname: &str, line: usize) -> impl Iterator<Item=String> + '_  {
+    // iterates over the fastq file
+    // each fastq entry is four lines, we only pick out a specific one using the
+    // line arg:  
+    // line==0 -> header
+    // line==1 -> fastq seq
+    // line==2 -> sep
+    // line==3 -> phred    
     assert!(line < 4);
-    assert!(line >= 0);
+    // assert!(line >= 0);
 
     let decoder = bgzf::Reader::from_path(fastqname).unwrap();
     let reader = BufReader::new(decoder);
@@ -21,7 +28,7 @@ pub fn fast_iter(fastqname: &str, line: usize) -> impl Iterator<Item=String> + '
     my_iter
 }
 
-pub fn fastq_iter_bare(fastq_list: &Vec<String>, line: usize) -> impl Iterator<Item=String> + '_ {
+pub fn fastq_list_iter(fastq_list: &Vec<String>, line: usize) -> impl Iterator<Item=String> + '_ {
     // iterates over the concatenation of fastq files specified
     // each fastq entry is four lines, we only pick out a specific one using the
     // line arg:  
@@ -30,11 +37,11 @@ pub fn fastq_iter_bare(fastq_list: &Vec<String>, line: usize) -> impl Iterator<I
     // line==2 -> sep
     // line==3 -> phred
     assert!(line < 4);
-    assert!(line >= 0);
+    // assert!(line >= 0);
     let my_iter = fastq_list.into_iter()
-        .map(move |fname| fast_iter(fname, line))
+        .map(move |fname| fastq_iter(fname, line))
         // chaining, flatmapping all the iterators into a single one
-        .flat_map(|x| x);     
+        .flatten();     
     my_iter     
 }
 
@@ -42,10 +49,10 @@ pub fn fastq_iter_bare(fastq_list: &Vec<String>, line: usize) -> impl Iterator<I
 // ==================================================================================================================================
 pub fn fast_iter_old(fastqname: &str, line: usize) -> impl Iterator<Item=String> + '_  {
     assert!(line < 4);
-    assert!(line >= 0);
+    // assert!(line >= 0);
     let decoder = bgzf::Reader::from_path(fastqname).unwrap();
     let reader = BufReader::new(decoder);
-    let line_tmp = line.clone();
+    let line_tmp = line;
     let my_iter = reader.lines()
         .enumerate().filter( move |(line_id, _)| line_id % 4 == line_tmp)
         .map(|(_, res)| res)
@@ -62,11 +69,11 @@ pub fn fastq_iter_bare_old(fastq_list: &Vec<String>, line: usize) -> impl Iterat
     // line==2 -> sep
     // line==3 -> phred
     assert!(line < 4);
-    assert!(line >= 0);
-    let my_iter = fastq_list.into_iter()
+    // assert!(line >= 0);
+    let my_iter = fastq_list.iter()
         .map(move |fname| fast_iter_old(fname, line))
         // chaining, flatmapping all the iterators into a single one
-        .flat_map(|x| x);
+        .flatten();
     my_iter
 }
 // ==================================================================================================================================
@@ -96,27 +103,25 @@ FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     f.write_all(fastq_entry2.as_bytes()).expect("Unable to write data");
     f.flush().unwrap();
 
-    let lines: Vec<_> = fastq_iter_bare(&vec![fastqname.to_string()],0).collect();
+    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()],0).collect();
     assert_eq!(lines, vec!["@some read id", "@another read id"]);
 
-    let lines: Vec<_> = fastq_iter_bare(&vec![fastqname.to_string()],1).collect();
+    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()],1).collect();
     assert_eq!(lines, vec!["AAAATTTTGGGGCCCCAAAATTTTGGGGCCCCAAAATTTTGGGGCCCC", "GGGGCCCCAAAATTTTGGGGCCCCAAAATTTTGGGGCCCCAAAATTTT"]);
 
-    let lines: Vec<_> = fastq_iter_bare(&vec![fastqname.to_string()],3).collect();
+    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()],3).collect();
     assert_eq!(lines, vec!["FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"])    ;
 }
 
 
-pub fn fastq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
+pub fn fastq_seq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
     // iterates the sequences of the the fast files
-    let my_iter = fastq_iter_bare(fastq_list, 1).filter_map(|line| parse_r1_struct(line));
-    my_iter
+    fastq_list_iter(fastq_list, 1).filter_map(|line| parse_r1_struct(line))
 }
 
-pub fn phred_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=String> + '_ {
+pub fn fastq_phred_iter (fastq_list: &Vec<String>) -> impl Iterator<Item=String> + '_ {
     // instead if yielding the sequence, this one yields the PHRED ASCII scores of the reads
-    let my_iter = fastq_iter_bare(fastq_list, 3);
-    my_iter
+    fastq_list_iter(fastq_list, 3)
 }
 
 

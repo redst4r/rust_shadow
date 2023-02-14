@@ -1,6 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use bktree::BkTree;
-use rustbustools::io::{CellIterator, BusRecord, BusFolder};
+use rustbustools::io::{BusRecord, BusFolder};
+use rustbustools::iterators::{CellIterator};
+
 use crate::utils::{CbUmi, CbUmiGene, write_to_csv, sequence_composition, all_mutations_for_cbumi};
 use rustbustools::utils::int_to_seq;
 use counter::Counter;
@@ -47,7 +49,7 @@ const RECORD_SIZE_THRESHOLD: usize = 100;
 pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2gfile: String){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
 
-    let bfolder = BusFolder::new(busfolder.clone(), t2gfile);
+    let bfolder = BusFolder::new(&busfolder, &t2gfile);
     let ec2gene= bfolder.ec2gene;
     let busfile = format!("{}/output.corrected.sort.bus", busfolder);
 
@@ -109,9 +111,9 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
     // ParquetWriter::new(fh).finish(&mut df);
 }
 
-fn bus_record_to_cbumigene(r: &BusRecord, ec2gene_dict: &HashMap<u32, Vec<String>>) -> Option<CbUmiGene>{
+fn bus_record_to_cbumigene(r: &BusRecord, ec2gene_dict: &HashMap<u32, HashSet<String>>) -> Option<CbUmiGene>{
     // returns, but only if the record maps to a single gene!
-    let genes = ec2gene_dict.get(&(r.EC as u32)).expect(&format!("EC {} not found", r.EC));
+    let genes = ec2gene_dict.get(&(r.EC as u32)).unwrap_or_else(|| panic!("EC {} not found", r.EC));
 
     // genes.sort();
     //turn into a string
@@ -156,7 +158,7 @@ pub fn find_correct_umis_cug(counter: &Counter<CbUmiGene, u32>) -> Vec<CbUmiGene
 
     for (cug, _freq) in counter.most_common(){
         let matches = bk.find(cug.clone(), 1);
-        if matches.len() == 0{
+        if matches.is_empty(){
             correct_umis.push(cug.clone());  // add it to the topN list
         }
         bk.insert(cug);
@@ -193,7 +195,7 @@ pub fn find_shadows_cug(cug: CbUmiGene, filtered_map: &Counter<CbUmiGene, u32>) 
 /// For the BusRecords from a single cell, estimate the UMI errors for all records
 /// will return a dataframe with each row being a true molecules (with number of shadows per position)
 /// it'll be roughly the same size as bus_records.len() (minus the shadows)
-fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, Vec<String>>) -> DataFrame{
+fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, HashSet<String>>) -> DataFrame{
 
     // count UMI frequencies
     let mut freq_map: Counter<CbUmiGene, u32> = Counter::new();
@@ -265,7 +267,7 @@ fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, Vec<String>>
     let mut counter_t: Vec<u32> = Vec::new();
     
     for u in umis.iter(){
-        let (ca, cc, cg, ct) = sequence_composition(&u);
+        let (ca, cc, cg, ct) = sequence_composition(u);
         counter_a.push(ca);
         counter_c.push(cc);
         counter_g.push(cg);
@@ -280,8 +282,7 @@ fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, Vec<String>>
     let df_ng = Series::new("number_of_G", counter_g);
     let df_nt = Series::new("number_of_T", counter_t);
 
-    let df_final = df.hstack(&[df_cb, df_umi,df_gene, df_na, df_nc, df_ng, df_nt]).unwrap();    
-    df_final
+    df.hstack(&[df_cb, df_umi,df_gene, df_na, df_nc, df_ng, df_nt]).unwrap()
 }
 
 

@@ -27,7 +27,7 @@ impl CbUmi {
     pub fn to_string(&self) -> String{
         format!("{}_{}", self.cb, self.umi)
     }
-    pub fn from_string(s:&String) -> CbUmi{
+    pub fn from_string(s:&str) -> CbUmi{
         let mut split = s.split('_');
         let cb = split.next().expect(s);
         let umi = split.next().expect(s);
@@ -49,7 +49,7 @@ impl CbUmiGene {
     pub fn to_string(&self) -> String{
         format!("{}_{}_{}", self.cb, self.umi, self.gene)
     }
-    pub fn from_string(s:&String) -> CbUmiGene{
+    pub fn from_string(s:&str) -> CbUmiGene{
         let mut split = s.split('_');
         let cb = split.next().expect(s);
         let umi = split.next().expect(s);
@@ -81,7 +81,7 @@ pub fn get_1bp_mutations(seq: &String, pos: usize) -> Vec<String>{
         //     mutation.push(m);
         // }
     // }
-    return mutation
+    mutation
 }
 
 pub fn all_mutations_for_cbumi(cb_umi: CbUmi) -> Vec<(CbUmi, usize)>{
@@ -161,7 +161,7 @@ pub fn my_hamming(a: &String, b: &String) -> isize {
 }
 
 
-pub fn sequence_composition(s: &String) -> (u32, u32,u32,u32){
+pub fn sequence_composition(s: &str) -> (u32, u32,u32,u32){
     let mut counter_a = 0;
     let mut counter_c = 0;
     let mut counter_g = 0;
@@ -177,7 +177,7 @@ pub fn sequence_composition(s: &String) -> (u32, u32,u32,u32){
         }
     }
 
-    return (counter_a, counter_c, counter_g, counter_t)
+    (counter_a, counter_c, counter_g, counter_t)
 
 }
 

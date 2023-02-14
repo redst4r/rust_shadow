@@ -147,7 +147,6 @@ fn main() {
         MyCommand::cb_umi_sketch(args) => {
             println!("Doing CB_UMI sketch");
             cb_umi_sketch::run_top_n(&args.fastq_list, args.whitelist, cli.output, args.topn)
-            
         },
         MyCommand::cb_umi_cell(args) => {
             println!("Doing CB_UMI via single cells");
@@ -155,7 +154,7 @@ fn main() {
         }
         MyCommand::busmerge(args) => {
             println!("Doing bus merging");
-            busmerger::merge_busfiles_on_overlap(args.inbus1, args.inbus2, args.outbus1, args.outbus2)      
+            busmerger::merge_busfiles_on_overlap(&args.inbus1, &args.inbus2, &args.outbus1, &args.outbus2)      
         }
         MyCommand::tso_error(args) => {
             println!("Doing TSO error");
@@ -191,6 +190,6 @@ fn main() {
 
 pub fn count_fastq_reads(filename: String) -> usize{
     // count the nubmer of entries (not lines!) in the fastq
-    let count = rustfastq::io::fastq_iter_bare(&vec![filename], 1).count();
+    let count = rustfastq::io::fastq_list_iter(&vec![filename], 1).count();
     return count
 }

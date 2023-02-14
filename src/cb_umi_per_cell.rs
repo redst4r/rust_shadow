@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use bktree::BkTree;
-use rustbustools::io::{CellIterator, BusRecord};
+use rustbustools::io::{BusRecord};
+use rustbustools::iterators::{CellIterator};
+
 use crate::utils::{CbUmi, write_to_csv, my_hamming, sequence_composition};
 use rustbustools::utils::int_to_seq;
 
@@ -35,7 +37,7 @@ const RECORD_SIZE_THRESHOLD: usize = 100;
 /// 
 pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
-    let cb_iter = CellIterator::new(&busfile);
+    let cb_iter = CellIterator::new(busfile);
 
     let mut df = DataFrame::default();
     let bar = ProgressBar::new(nmax as u64);
@@ -162,7 +164,7 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
     let mut counter_t: Vec<u32> = Vec::new();
     
     for u in umis.iter(){
-        let (ca, cc, cg, ct) = sequence_composition(&u);
+        let (ca, cc, cg, ct) = sequence_composition(u);
         counter_a.push(ca);
         counter_c.push(cc);
         counter_g.push(cg);
@@ -194,7 +196,7 @@ pub fn find_correct_umis(counter: &Counter<CbUmi, u32>) -> Vec<CbUmi>{
 
         let umi = cbumi.umi.clone();
         let matches = bk.find(umi.clone(), 1);
-        if matches.len() == 0{
+        if matches.is_empty() {
             correct_umis.push(cbumi.clone());  // add it to the topN list
         }
         bk.insert(umi);
@@ -217,7 +219,7 @@ pub fn find_correct_umis_faster(counter: &Counter<CbUmi, u32>) -> (Vec<CbUmi>, B
 
         let umi = cbumi.umi.clone();
         let matches = bk.find(umi.clone(), 1);
-        if matches.len() == 0{
+        if matches.is_empty() {
             correct_umis.push(cbumi.clone());  // add it to the topN list
         }
         bk.insert(umi);
@@ -289,7 +291,7 @@ fn find_first_mismatch(a: &String, b: &String) -> Option<usize>{
             counter+=1;
         }
     }
-    return None
+    None
 }
 
 pub fn find_shadows_bktree(correct_cbumi: CbUmi, bk: &BkTree<String>, filtered_map: &Counter<CbUmi, u32>) -> HashMap<usize, u32>{

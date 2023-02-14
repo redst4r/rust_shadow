@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use counter::Counter;
 use bktree::BkTree;
-use crate::utils::{get_1bp_mutations, write_to_csv, my_hamming};
+use crate::{utils::{get_1bp_mutations, write_to_csv, my_hamming}, io::fastq_seq_iter};
 use polars::prelude::{DataFrame, NamedFrom, Series};
-use crate::io::{parse_whitelist_gz,fastq_iter};
+use crate::io::{parse_whitelist_gz};
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<String, i32> {
     // coutns the CB/UMI pairs in the fastqs
 
 
     // reading the fastq.gz
-    let my_iter = fastq_iter(fname_list);
+    let my_iter = fastq_seq_iter(fname_list);
 
     // parsing the lines, counting
     let mut countermap: Counter<String, i32> = Counter::new();
@@ -52,7 +52,7 @@ pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
     let mut c = 0;
     for (cb, _freq) in counter.most_common(){
         let cb2 = cb.clone();  // TODO stupid cloing to be able to insert
-        if bk.find(cb, 1).len() == 0{
+        if bk.find(cb, 1).is_empty() {
             // let cb_umi = format!("{cb}_{umi}");
             top2.push(cb2.clone());  // add it to the topN list
             c += 1;

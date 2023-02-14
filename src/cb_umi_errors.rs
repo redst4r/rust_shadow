@@ -3,13 +3,13 @@ use counter::Counter;
 use bktree::BkTree;
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::utils::{write_to_csv, all_mutations_for_cbumi, CbUmi, my_hamming};
-use crate::io::{parse_whitelist_gz,fastq_iter};
+use crate::io::{parse_whitelist_gz, fastq_seq_iter};
 
 pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<CbUmi, u32> {
     // coutns the CB/UMI pairs in the fastq
 
     // reading the fastq.gz
-    let my_iter = fastq_iter(fname_list);
+    let my_iter = fastq_seq_iter(fname_list);
 
     // parsing the lines, counting
     let mut countermap: Counter<CbUmi, u32> = Counter::new();
@@ -36,7 +36,7 @@ pub fn top_n(counter: &Counter<CbUmi, u32>, n: usize) -> Vec<CbUmi>{
     for (cbumi, _freq) in counter.most_common(){
 
         let matches = bk.find(cbumi.to_string(), 1);
-        if matches.len() == 0{
+        if matches.is_empty() {
             top2.push(cbumi.clone());  // add it to the topN list
             c += 1;
         }

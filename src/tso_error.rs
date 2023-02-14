@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use counter::Counter;
 use bktree::BkTree;
 use crate::utils::{write_to_csv, my_hamming, CbUmi};
-use crate::io::fastq_iter;
+use crate::io::{fastq_iter, fastq_seq_iter};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::cb_umi_errors::find_shadows;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -25,7 +25,7 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
     let tso3 = "GCAGTGGTATCAACGC_AGAGTACATGGG".to_string();
     let tso4 = "CAGTGGTATCAACGCA_GAGTACATGGGG".to_string();
     let tso_list = vec![tso1, tso2, tso3, tso4];
-    let my_iter = fastq_iter(fast_files);
+    let my_iter = fastq_seq_iter(fast_files);
     let mut counter: Counter<CbUmi, u32> = Counter::new();
 
     let mut bk: BkTree<String> = BkTree::new(my_hamming);

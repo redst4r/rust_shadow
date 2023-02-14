@@ -14,7 +14,7 @@
 use counter::Counter;
 use std::collections::HashMap;
 use crate::utils::{write_to_csv, all_mutations_for_cbumi, CbUmi} ;
-use crate::io::{parse_whitelist_gz,fastq_iter};
+use crate::io::{parse_whitelist_gz, fastq_seq_iter};
 // use crate::sketching::GreaterThan1Bloom;
 use crate::cb_umi_errors::{top_n, find_shadows};
 use polars::prelude::{DataFrame, NamedFrom, Series};
@@ -27,14 +27,14 @@ pub fn run_top_n(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fi
     let whitelist = parse_whitelist_gz(&whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
-    let my_iter = fastq_iter(fastq_list);
+    let my_iter = fastq_seq_iter(fastq_list);
     //--------------------------
     // first pass over data
     // keepign track of the topN elements in  the approximate counter
     // however, only add XB/UMI that are whitelisted
     let tol = 1e-8;
     let prob = 0.000001;
-    let mut ccc:Top<String, u32> = Top::new(topn, prob, tol, {});    
+    let mut ccc:Top<String, u32> = Top::new(topn, prob, tol, ());    
 
     // let bar = ProgressBar::new_spinner();
     for (i, cbumi) in my_iter.enumerate(){
@@ -75,7 +75,7 @@ pub fn run_top_n(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fi
     }
     
     // now go thorugh the fastqs again, recoding the TRUE frequencies of those items
-    let my_iter = fastq_iter(fastq_list);
+    let my_iter = fastq_seq_iter(fastq_list);
 
     println!("Second pass");
 

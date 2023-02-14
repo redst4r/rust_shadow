@@ -1,7 +1,7 @@
 use counter::Counter;
 use crate::utils::{write_to_csv, };
 use polars::prelude::*;
-use crate::io::phred_iter;
+use crate::io::fastq_phred_iter;
 use indicatif::{ProgressBar, ProgressStyle, };
 
 
@@ -9,8 +9,7 @@ use indicatif::{ProgressBar, ProgressStyle, };
 #[test]
 fn main(){
     use crate::test_files::TEST_FASTQ_R1;
-    run(&vec![TEST_FASTQ_R1.to_string()],
-    "/tmp/phred.csv".to_string(),
+    run(&vec![TEST_FASTQ_R1.to_string()],"/tmp/phred.csv".to_string(),
 )
 }
 
@@ -19,7 +18,7 @@ pub fn run(fastq_files: &Vec<String>, output_csv_file:String){
 
     let mut phred_counter: Counter<(char, usize), u64> = Counter::new();  // phred, position -> #counts
 
-    let my_iter = phred_iter(fastq_files);
+    let my_iter = fastq_phred_iter(fastq_files);
 
     let bar = ProgressBar::new_spinner();
     bar.set_style(ProgressStyle::default_bar()
