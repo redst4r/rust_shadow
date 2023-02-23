@@ -1,25 +1,10 @@
 
-// mod sketching;
-
-// use std::collections::HashMap;
-
 use std::io::Write;
 use std::fs::File;
 use std::time::Instant;
-
 use rustbustools::busmerger;
 use clap::{self, Parser, Subcommand, Args};
-// mod tso_error;
-// mod cb_umi_per_cell;
-// mod phred_counter;
-// mod cb_umi_per_cell_gene;
-// mod cb_umi_errors;
-// mod cb_umi_sketch;
-// mod cb_errors;
-// mod utils;
-// mod test_files;
-
-use rustfastq::{io, cb_errors, cb_umi_errors, cb_umi_sketch, cb_umi_per_cell, phred_counter, tso_error, cb_umi_per_cell_gene};
+use rustfastq::{cb_errors, cb_umi_errors, cb_umi_sketch, cb_umi_per_cell, phred_counter, tso_error, cb_umi_per_cell_gene};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -181,15 +166,14 @@ fn main() {
                 println!("Counted {}, took {} minutes.", filename.clone(), elapsed_time.as_secs()/60);                
 
                 // write result to filen
-                file_handle.write(format!("{}\t{}\n", filename, c).as_bytes()).unwrap();
+                file_handle.write_all(format!("{}\t{}\n", filename, c).as_bytes()).unwrap();
             }
         }
     };
 }
 
-
 pub fn count_fastq_reads(filename: String) -> usize{
     // count the nubmer of entries (not lines!) in the fastq
-    let count = rustfastq::io::fastq_list_iter(&vec![filename], 1).count();
-    return count
+    let count = rustfastq::io::fastq_list_iter(&[filename], 1).count();
+    count
 }

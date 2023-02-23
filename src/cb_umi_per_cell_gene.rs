@@ -173,7 +173,7 @@ pub fn find_shadows_cug(cug: CbUmiGene, filtered_map: &Counter<CbUmiGene, u32>) 
     // we get a dcitionary with position -> #shadow reads
     let all_muts: Vec<(CbUmiGene, usize)> = all_mutations_for_cbumi(CbUmi {cb: cug.cb, umi: cug.umi})
                 .iter() 
-                .map(|(cu, pos)| (CbUmiGene{cb: cu.cb.clone(), umi:cu.umi.clone(), gene:cug.gene.clone()}, pos.clone()))
+                .map(|(cu, pos)| (CbUmiGene{cb: cu.cb.clone(), umi:cu.umi.clone(), gene:cug.gene.clone()}, *pos))
                 .collect();
 
     let mut n_shadows_per_pos: HashMap<usize, u32> = HashMap::new();
@@ -255,7 +255,7 @@ fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, HashSet<Stri
     // problem, we need the colums sorted, for later stacking
     let mut vec_series = 
         polars_data.into_iter()
-            .map(|(name, values)| Series::new(&format!("{name}"), values))
+            .map(|(name, values)| Series::new(&name, values))
             .collect::<Vec<_>>();
     vec_series.sort_by(|a, b| a.name().partial_cmp(b.name()).unwrap());
     

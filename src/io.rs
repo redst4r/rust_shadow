@@ -6,7 +6,6 @@ use std::collections::HashSet;
 use crate::utils::CbUmi;
 use crate::utils::parse_r1_struct;
 
-
 pub fn fastq_iter(fastqname: &str, line: usize) -> impl Iterator<Item=String> + '_  {
     // iterates over the fastq file
     // each fastq entry is four lines, we only pick out a specific one using the
@@ -28,39 +27,7 @@ pub fn fastq_iter(fastqname: &str, line: usize) -> impl Iterator<Item=String> + 
     my_iter
 }
 
-pub fn fastq_list_iter(fastq_list: &Vec<String>, line: usize) -> impl Iterator<Item=String> + '_ {
-    // iterates over the concatenation of fastq files specified
-    // each fastq entry is four lines, we only pick out a specific one using the
-    // line arg:  
-    // line==0 -> header
-    // line==1 -> fastq seq
-    // line==2 -> sep
-    // line==3 -> phred
-    assert!(line < 4);
-    // assert!(line >= 0);
-    let my_iter = fastq_list.into_iter()
-        .map(move |fname| fastq_iter(fname, line))
-        // chaining, flatmapping all the iterators into a single one
-        .flatten();     
-    my_iter     
-}
-
-
-// ==================================================================================================================================
-pub fn fast_iter_old(fastqname: &str, line: usize) -> impl Iterator<Item=String> + '_  {
-    assert!(line < 4);
-    // assert!(line >= 0);
-    let decoder = bgzf::Reader::from_path(fastqname).unwrap();
-    let reader = BufReader::new(decoder);
-    let line_tmp = line;
-    let my_iter = reader.lines()
-        .enumerate().filter( move |(line_id, _)| line_id % 4 == line_tmp)
-        .map(|(_, res)| res)
-        .filter_map(|line| line.ok()); //takes care of errors in file reading
-    my_iter
-}
-
-pub fn fastq_iter_bare_old(fastq_list: &Vec<String>, line: usize) -> impl Iterator<Item=String> + '_ {
+pub fn fastq_list_iter(fastq_list: &[String], line: usize) -> impl Iterator<Item=String> + '_ {
     // iterates over the concatenation of fastq files specified
     // each fastq entry is four lines, we only pick out a specific one using the
     // line arg:  
@@ -71,13 +38,13 @@ pub fn fastq_iter_bare_old(fastq_list: &Vec<String>, line: usize) -> impl Iterat
     assert!(line < 4);
     // assert!(line >= 0);
     let my_iter = fastq_list.iter()
-        .map(move |fname| fast_iter_old(fname, line))
-        // chaining, flatmapping all the iterators into a single one
-        .flatten();
-    my_iter
-}
-// ==================================================================================================================================
+        .flat_map(move |fname| fastq_iter(fname, line));
 
+        // .map(move |fname| fastq_iter(fname, line))
+        // chaining, flatmapping all the iterators into a single one
+        // .flatten();     
+    my_iter     
+}
 
 #[test]
 fn test_fastq(){
@@ -114,16 +81,15 @@ FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 }
 
 
-pub fn fastq_seq_iter(fastq_list: &Vec<String>) -> impl Iterator<Item=CbUmi> + '_ {
+pub fn fastq_seq_iter(fastq_list: &[String]) -> impl Iterator<Item=CbUmi> + '_ {
     // iterates the sequences of the the fast files
-    fastq_list_iter(fastq_list, 1).filter_map(|line| parse_r1_struct(line))
+    fastq_list_iter(fastq_list, 1).filter_map(parse_r1_struct)
 }
 
-pub fn fastq_phred_iter (fastq_list: &Vec<String>) -> impl Iterator<Item=String> + '_ {
+pub fn fastq_phred_iter (fastq_list: &[String]) -> impl Iterator<Item=String> + '_ {
     // instead if yielding the sequence, this one yields the PHRED ASCII scores of the reads
     fastq_list_iter(fastq_list, 3)
 }
-
 
 pub fn parse_whitelist_gz(fname: &String) -> HashSet<String>{
     // loading 10x CB whilelist from file
@@ -131,10 +97,8 @@ pub fn parse_whitelist_gz(fname: &String) -> HashSet<String>{
     let reader = BufReader::new(decoder);
     let my_iter = reader.lines();//.take(10_000_000);
     let mut hset: HashSet<String> = HashSet::new();
-    for l in my_iter{
-        if let Ok(line) = l{
-            hset.insert(line);
-        }
+    for line in my_iter.flatten(){  // flatten filters out the Error elements
+        hset.insert(line);
     }
     hset
 }

@@ -14,7 +14,7 @@ fn main(){
 }
 
 
-pub fn run(fastq_files: &Vec<String>, output_csv_file:String){
+pub fn run(fastq_files: &[String], output_csv_file:String){
 
     let mut phred_counter: Counter<(char, usize), u64> = Counter::new();  // phred, position -> #counts
 

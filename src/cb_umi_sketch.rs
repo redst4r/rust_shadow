@@ -23,7 +23,7 @@ use streaming_algorithms::Top;
 // use indicatif::ProgressBar;
 
 
-pub fn run_top_n(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
+pub fn run_top_n(fastq_list: &[String], whitelist_file: String, output_csv_file: String, topn:usize){
     let whitelist = parse_whitelist_gz(&whitelist_file);
     println!("Whitelist len {}", whitelist.len());
 
@@ -166,7 +166,7 @@ pub fn run_top_n(fastq_list: &Vec<String>, whitelist_file: String, output_csv_fi
     // to polars dataframe
     let df = DataFrame::new(
         polars_data.into_iter()
-            .map(|(name, values)| Series::new(&format!("{name}"), values))
+            .map(|(name, values)| Series::new(&name, values))
             .collect::<Vec<_>>()).unwrap();
 
     let df_cb = Series::new("CB", cellnames);

@@ -5,10 +5,8 @@ use crate::{utils::{get_1bp_mutations, write_to_csv, my_hamming}, io::fastq_seq_
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::io::{parse_whitelist_gz};
 
-pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<String, i32> {
+pub fn count_cb_filelist(fname_list: &[String]) -> Counter<String, i32> {
     // coutns the CB/UMI pairs in the fastqs
-
-
     // reading the fastq.gz
     let my_iter = fastq_seq_iter(fname_list);
 
@@ -25,7 +23,6 @@ pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<String, i32> {
     }
     countermap
 }
-
 
 pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
 
@@ -67,7 +64,6 @@ pub fn top_n(counter: &Counter<String, i32>, n: usize) -> Vec<String>{
         }          
     }
     assert_eq!(top2.len(), n);
-
     top2
 }
 
@@ -100,7 +96,7 @@ pub fn find_shadows(cb: String, filtered_map: &Counter<String, i32>) -> HashMap<
 }
 
 
-pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
+pub fn run(fastq_list: &[String], whitelist_file: String, output_csv_file: String, topn:usize){
 
     // parse whitelist
     let whitelist = parse_whitelist_gz(&whitelist_file);
@@ -144,7 +140,7 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     // to polars dataframe
     let df = DataFrame::new(
         polars_data.into_iter()
-            .map(|(name, values)| Series::new(&format!("{name}"), values))
+            .map(|(name, values)| Series::new(&name, values))
             .collect::<Vec<_>>()).unwrap();
     
     let df_cb = Series::new("CB", cellnames);

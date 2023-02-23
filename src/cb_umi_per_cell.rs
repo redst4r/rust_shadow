@@ -35,7 +35,7 @@ const RECORD_SIZE_THRESHOLD: usize = 100;
 /// The results are aggregated at a cell level, i.e. per cell, how many times was a UMI correct, how often was there an error at base1 etc..
 /// 
 /// 
-pub fn run(busfile: &String, outfile: &String, nmax: usize, aggregate: bool){
+pub fn run(busfile: &str, outfile: &str, nmax: usize, aggregate: bool){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
     let cb_iter = CellIterator::new(busfile);
 
@@ -152,7 +152,7 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
     // problem, we need the colums sorted, for later stacking
     let mut vec_series = 
         polars_data.into_iter()
-            .map(|(name, values)| Series::new(&format!("{name}"), values))
+            .map(|(name, values)| Series::new(&name, values))
             .collect::<Vec<_>>();
     vec_series.sort_by(|a, b| a.name().partial_cmp(b.name()).unwrap());
     
@@ -178,9 +178,7 @@ fn do_single_cb(bus_records: Vec<BusRecord>) -> DataFrame{
     let df_ng = Series::new("number_of_G", counter_g);
     let df_nt = Series::new("number_of_T", counter_t);
 
-
-    let df_final = df.hstack(&[df_cb, df_umi, df_na, df_nc, df_ng, df_nt]).unwrap();    
-    df_final
+    df.hstack(&[df_cb, df_umi, df_na, df_nc, df_ng, df_nt]).unwrap()
 
 }
 
@@ -235,7 +233,7 @@ fn do_single_cb_bktree(bus_records: Vec<BusRecord>) -> DataFrame{
     // count UMI frequencies
 
     let mut freq_map: Counter<CbUmi, u32> = Counter::new();
-    for cbumi in bus_records.iter().map(|r| bus_record_to_cbumi(r) ){
+    for cbumi in bus_records.iter().map(bus_record_to_cbumi){
         let c = freq_map.entry(cbumi).or_insert(0);
         *c +=1;
     }
@@ -266,7 +264,7 @@ fn do_single_cb_bktree(bus_records: Vec<BusRecord>) -> DataFrame{
     // problem, we need the colums sorted, for later stacking
     let mut vec_series = 
         polars_data.into_iter()
-            .map(|(name, values)| Series::new(&format!("{name}"), values))
+            .map(|(name, values)| Series::new(&name, values))
             .collect::<Vec<_>>();
     vec_series.sort_by(|a, b| a.name().partial_cmp(b.name()).unwrap());
     
@@ -275,9 +273,7 @@ fn do_single_cb_bktree(bus_records: Vec<BusRecord>) -> DataFrame{
     let df_cb = Series::new("CB", cellnames);
     let df_umi = Series::new("UMI", umis);
 
-    let df_final = df.hstack(&[df_cb, df_umi]).unwrap();    
-    df_final
-
+    df.hstack(&[df_cb, df_umi]).unwrap()
 }
 
 

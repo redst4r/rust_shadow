@@ -5,7 +5,7 @@ use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::utils::{write_to_csv, all_mutations_for_cbumi, CbUmi, my_hamming};
 use crate::io::{parse_whitelist_gz, fastq_seq_iter};
 
-pub fn count_cb_filelist(fname_list: &Vec<String>) -> Counter<CbUmi, u32> {
+pub fn count_cb_filelist(fname_list: &[String]) -> Counter<CbUmi, u32> {
     // coutns the CB/UMI pairs in the fastq
 
     // reading the fastq.gz
@@ -76,7 +76,7 @@ pub fn find_shadows(cb_umi: CbUmi, filtered_map: &Counter<CbUmi, u32>) -> HashMa
 }
 
 
-pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: String, topn:usize){
+pub fn run(fastq_list: &[String], whitelist_file: String, output_csv_file: String, topn:usize){
 
 
     // parse whitelist
@@ -139,7 +139,7 @@ pub fn run(fastq_list: &Vec<String>, whitelist_file: String, output_csv_file: St
     // to polars dataframe
     let df = DataFrame::new(
         polars_data.into_iter()
-            .map(|(name, values)| Series::new(&format!("{name}"), values))
+            .map(|(name, values)| Series::new(&name, values))
             .collect::<Vec<_>>()).unwrap();
 
     let df_cb = Series::new("CB", cellnames);

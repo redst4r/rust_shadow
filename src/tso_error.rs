@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use counter::Counter;
 use bktree::BkTree;
 use crate::utils::{write_to_csv, my_hamming, CbUmi};
-use crate::io::{fastq_iter, fastq_seq_iter};
+use crate::io::{fastq_seq_iter};
 use polars::prelude::{DataFrame, NamedFrom, Series};
 use crate::cb_umi_errors::find_shadows;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -17,7 +17,7 @@ fn testing(){
     run(&s, "/tmp/tso.csv".to_string());
 }
 
-pub fn run(fast_files: &Vec<String>, output_csv_file:String){
+pub fn run(fast_files: &[String], output_csv_file:String){
 
     // check anything that is close to the TSO sequence, or shifted by a few base pairs
     let tso1 = "AAGCAGTGGTATCAAC_GCAGAGTACATG".to_string();  //note the _ sepaation of CB and UMI
@@ -49,14 +49,14 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
         // using a BKtree
         if true{
             let hits = bk.find(seq.to_string(), 1);
-            if hits.len() > 0{
+            if hits.is_empty(){
                 // we found something thats close to the TSO
                 let counter = counter.entry(seq).or_insert(0);
                 *counter += 1;
             }
         }
         else{
-            let max_distance = tso_list.iter().map(|tso| my_hamming(&tso, &seq.to_string())).min().unwrap();
+            let max_distance = tso_list.iter().map(|tso| my_hamming(tso, &seq.to_string())).min().unwrap();
             if max_distance <=1{
 
                 let counter = counter.entry(seq).or_insert(0);
@@ -94,7 +94,7 @@ pub fn run(fast_files: &Vec<String>, output_csv_file:String){
     // to polars dataframe
     let df = DataFrame::new(
         polars_data.into_iter()
-            .map(|(name, values)| Series::new(&format!("{name}"), values))
+            .map(|(name, values)| Series::new(&name, values))
             .collect::<Vec<_>>()).unwrap();
 
     let df_cb = Series::new("CB", cellnames);
