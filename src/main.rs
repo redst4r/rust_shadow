@@ -4,7 +4,7 @@ use std::fs::File;
 use std::time::Instant;
 use rustbustools::busmerger;
 use clap::{self, Parser, Subcommand, Args};
-use rustfastq::{cb_errors, cb_umi_errors, cb_umi_sketch, cb_umi_per_cell, phred_counter, tso_error, cb_umi_per_cell_gene};
+use rustfastq::{cb_errors, cb_umi_errors, cb_umi_sketch, cb_umi_per_cell, phred_counter, tso_error, cb_umi_per_cell_gene, io::test_filter};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -28,7 +28,8 @@ enum MyCommand {
     busmerge(BusMergeArgs),
     tso_error(TSOArgs),
     phred(PhredArgs),
-    count(CountArgs)
+    count(CountArgs),
+    filter,
 }
 
 #[derive(Args)]
@@ -169,6 +170,9 @@ fn main() {
                 file_handle.write_all(format!("{}\t{}\n", filename, c).as_bytes()).unwrap();
             }
         }
+        MyCommand::filter => {
+            test_filter();
+        },
     };
 }
 
