@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use bktree::BkTree;
+use rustbustools::consistent_genes::{Ec2GeneMapper, EC};
 use rustbustools::io::{BusRecord, BusFolder};
-use rustbustools::iterators::{CellIterator};
+use rustbustools::iterators::{CellGroupIterator};
 
 use crate::utils::{CbUmi, CbUmiGene, write_to_csv, sequence_composition, all_mutations_for_cbumi};
 use rustbustools::utils::int_to_seq;
@@ -50,11 +51,9 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
 
     let bfolder = BusFolder::new(&busfolder, &t2gfile);
-    let ec2gene= bfolder.ec2gene;
-    let busfile = format!("{}/output.corrected.sort.bus", busfolder);
+    let ec2gene= &bfolder.ec2gene;
 
-    let cb_iter = CellIterator::new(&busfile);
-
+    let cb_iter = bfolder.get_iterator().groupby_cb();
     let mut df = DataFrame::default();
     let bar = ProgressBar::new(nmax as u64);
     bar.set_style(ProgressStyle::default_bar()
@@ -67,7 +66,7 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
         .filter(|rec| rec.len()>RECORD_SIZE_THRESHOLD)  // only consider cells with a certain number of records
         {
 
-        let mut df_single_cell = do_single_cb(records, &ec2gene);
+        let mut df_single_cell = do_single_cb(records, ec2gene);
 
         // filter the UMI entries that have really high T nucleotide content
         let nt = df_single_cell.column("number_of_T").unwrap().u32().unwrap();
@@ -111,9 +110,9 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
     // ParquetWriter::new(fh).finish(&mut df);
 }
 
-fn bus_record_to_cbumigene(r: &BusRecord, ec2gene_dict: &HashMap<u32, HashSet<String>>) -> Option<CbUmiGene>{
+fn bus_record_to_cbumigene(r: &BusRecord, ec2gene_dict: &Ec2GeneMapper) -> Option<CbUmiGene>{
     // returns, but only if the record maps to a single gene!
-    let genes = ec2gene_dict.get(&(r.EC as u32)).unwrap_or_else(|| panic!("EC {} not found", r.EC));
+    let genes = ec2gene_dict.get_genenames(EC(r.EC));
 
     // genes.sort();
     //turn into a string
@@ -122,7 +121,7 @@ fn bus_record_to_cbumigene(r: &BusRecord, ec2gene_dict: &HashMap<u32, HashSet<St
         Some(CbUmiGene {
             cb: int_to_seq(r.CB, 16), 
             umi: int_to_seq(r.UMI, 12),
-            gene: genes.iter().next().unwrap().clone()
+            gene: genes.iter().next().unwrap().0.to_string()
         })
     }
     else{
@@ -195,13 +194,17 @@ pub fn find_shadows_cug(cug: CbUmiGene, filtered_map: &Counter<CbUmiGene, u32>) 
 /// For the BusRecords from a single cell, estimate the UMI errors for all records
 /// will return a dataframe with each row being a true molecules (with number of shadows per position)
 /// it'll be roughly the same size as bus_records.len() (minus the shadows)
-fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &HashMap<u32, HashSet<String>>) -> DataFrame{
+fn do_single_cb(bus_records: Vec<BusRecord>, ec2gene: &Ec2GeneMapper) -> DataFrame{
 
     // count UMI frequencies
     let mut freq_map: Counter<CbUmiGene, u32> = Counter::new();
     let mut _n_unique_mapped = 0;
     let mut _n_not_unique_mapped = 0;
-    for (cbumi, frequency) in bus_records.iter().map(|r| (bus_record_to_cbumigene(r, ec2gene), r.COUNT) ){
+    let iii = bus_records.iter()
+        .map(|r| 
+            (bus_record_to_cbumigene(r, ec2gene), r.COUNT) 
+        );
+    for (cbumi, frequency) in iii {
         if let Some(cbumigene) = cbumi{  
             // mapped to a single gene
             let c = freq_map.entry(cbumigene).or_insert(0);

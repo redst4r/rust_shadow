@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use bktree::BkTree;
-use rustbustools::io::{BusRecord};
-use rustbustools::iterators::{CellIterator};
+use rustbustools::io::{BusRecord, BusReader};
+use rustbustools::iterators::{CellGroupIterator};
 
 use crate::utils::{CbUmi, write_to_csv, my_hamming, sequence_composition};
 use rustbustools::utils::int_to_seq;
@@ -37,8 +37,8 @@ const RECORD_SIZE_THRESHOLD: usize = 100;
 /// 
 pub fn run(busfile: &str, outfile: &str, nmax: usize, aggregate: bool){
     // nmax: maximum number of barcodes to consider, should be on the order of several millions
-    let cb_iter = CellIterator::new(busfile);
 
+    let cb_iter = BusReader::new(busfile).groupby_cb();
     let mut df = DataFrame::default();
     let bar = ProgressBar::new(nmax as u64);
     bar.set_style(ProgressStyle::default_bar()
