@@ -25,11 +25,11 @@ impl FastqEntry{
         // format!("{}\n{}\n+\n{}\n", self.header, self.seq, self.phred)
         let mut s = String::with_capacity(self.header.len()+self.seq.len()*2+5); //4newlines and a +
         s.push_str(&self.header);
-        s.push_str("\n");
+        s.push('\n');
         s.push_str(&self.seq);
         s.push_str("\n+\n");        
         s.push_str(&self.phred);
-        s.push_str("\n");
+        s.push('\n');
         s
     }
 }
@@ -111,8 +111,7 @@ fn test_PhredCache(){
 // #[cached]
 fn phred_symbol_to_prob(phred: char) -> f32{
     let q = (phred as u32) - 33;
-    let p = 10_f32.powf(-(q as f32) /10_f32);
-    p
+    10_f32.powf(-(q as f32) /10_f32)
 }
 
 // fn avg_phred(phred: &str) -> f32{
@@ -136,8 +135,8 @@ fn test_make_fastq(){
     let mut writer = BufWriter::new(encoder);
     
     // let seq_len = 150;
-    let dummyseq = std::iter::repeat("A").take(150).collect::<String>();
-    let dummphred = std::iter::repeat("F").take(150).collect::<String>();
+    let dummyseq = "A".repeat(150);
+    let dummphred = "F".repeat(150);
 
     for i in 0..n{
 

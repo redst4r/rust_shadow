@@ -37,7 +37,7 @@ pub fn run(fast_files: &[String], output_csv_file:String){
     let bar = ProgressBar::new_spinner();
     // let bar = ProgressBar::new(top_x);
     bar.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] {bar:40.cyan/blue} {spinner} {per_sec}")
+        .template("[{elapsed_precise}] {bar:40.cyan/blue} {spinner} {per_sec}").unwrap()
         .progress_chars("##-"));
 
 

@@ -42,7 +42,7 @@ pub fn run(busfile: &str, outfile: &str, nmax: usize, aggregate: bool){
     let mut df = DataFrame::default();
     let bar = ProgressBar::new(nmax as u64);
     bar.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed_precise} ETA {eta}] {bar:40.cyan/blue} {pos}/{len} {per_sec}")
+        .template("[{elapsed_precise} ETA {eta}] {bar:40.cyan/blue} {pos}/{len} {per_sec}").unwrap()
         .progress_chars("##-"));
 
     let mut number_of_umis_seen = 0;

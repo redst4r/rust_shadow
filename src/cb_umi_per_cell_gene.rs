@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use bktree::BkTree;
 use rustbustools::consistent_genes::{Ec2GeneMapper, EC};
 use rustbustools::io::{BusRecord, BusFolder};
@@ -57,7 +57,7 @@ pub fn run(busfolder: String, outfile: &String, nmax: usize, aggregate: bool, t2
     let mut df = DataFrame::default();
     let bar = ProgressBar::new(nmax as u64);
     bar.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed_precise} ETA {eta}] {bar:40.cyan/blue} {pos}/{len} {per_sec}")
+        .template("[{elapsed_precise} ETA {eta}] {bar:40.cyan/blue} {pos}/{len} {per_sec}").unwrap()
         .progress_chars("##-"));
 
     let mut number_of_umis_seen = 0;

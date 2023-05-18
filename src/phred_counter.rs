@@ -22,7 +22,7 @@ pub fn run(fastq_files: &[String], output_csv_file:String){
 
     let bar = ProgressBar::new_spinner();
     bar.set_style(ProgressStyle::default_bar()
-        .template("[{elapsed_precise}] {pos} {per_sec}")
+        .template("[{elapsed_precise}] {pos} {per_sec}").unwrap()
         .progress_chars("##-"));
 
     for phred_string in my_iter{  //.take(1_000_0)

@@ -106,8 +106,8 @@ pub fn all_mutations_for_cbumi(cb_umi: CbUmi) -> Vec<(CbUmi, usize)>{
     let shadows = shadows_plain.iter() // convert back to CbUmi
         .map(|(cbumi_str, pos)| {
             let cbumi = CbUmi{ 
-                cb: (&cbumi_str[0..16]).to_string(), 
-                umi: (&cbumi_str[16..28]).to_string()
+                cb: (cbumi_str[0..16]).to_string(), 
+                umi: (cbumi_str[16..28]).to_string()
             };
             (cbumi, *pos)
         }
