@@ -1,10 +1,8 @@
 use core::panic;
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 use std::io::BufWriter;
-use std::io::Read;
 use std::io::Write;
 
 use rust_htslib::bgzf;
@@ -13,7 +11,7 @@ use std::collections::HashSet;
 use crate::utils::CbUmi;
 use crate::utils::parse_r1_struct;
 
-struct FastqEntry{
+pub struct FastqEntry{
     header: String,
     seq: String,
     phred: String
@@ -165,32 +163,6 @@ pub fn test_filter(){
     println!("Running took {} sec.", elapsed_time.as_secs());
 }
 
-#[test]
-pub fn test_iter_speed(){
-
-    // let file = "/home/michi/mounts/TB4drive/ISB_data/LT_pilot/LT_pilot/raw_data/DSP1/DSP1_CKDL210025651-1a-SI_TT_A2_HVWMHDSX2_S4_L001_R1_001.fastq.gz";
-    let file = "/home/michi/mounts/TB4drive/ISB_data/LT_pilot/LT_pilot/raw_data/Ice1/Ice1_CKDL210025651-1a-SI_TT_D2_HVWMHDSX2_S8_L001_R2_001.fastq.gz";
-
-    println!("iterating, old!");
-    use std::time::Instant;
-    let now = Instant::now();
-    let mut coll = Vec::new();
-    for s in fastq_iter(file, 1){
-        coll.push(s[..1].to_string())
-    }
-    let elapsed_time = now.elapsed();
-    println!("Old Running took {} sec.", elapsed_time.as_secs());
-
-    println!("iterating, new!");
-    let now = Instant::now();
-    let mut coll = Vec::new();
-    for s in fastq_iter_new(file, 1){
-        coll.push(s[..1].to_string())
-    }
-    let elapsed_time = now.elapsed();
-    println!("New Running took {} sec.", elapsed_time.as_secs());    
-}
-
 
 pub fn quality_filter(fastqname: &str, outname: &str, threshold_qc: f32){
     // reading the fastq
@@ -247,61 +219,12 @@ pub fn read_filter_whitelist(fastqname: &str, outname: &str, whitelist: &str){
 }
 
 
-pub fn fastq_iter(fastqname: &str, line: usize) -> impl Iterator<Item=String> + '_  {
-    // iterates over the fastq file
-    // each fastq entry is four lines, we only pick out a specific one using the
-    // line arg:  
-    // line==0 -> header
-    // line==1 -> fastq seq
-    // line==2 -> sep
-    // line==3 -> phred    
-    assert!(line < 4);
-    // assert!(line >= 0);
-
-    let decoder = bgzf::Reader::from_path(fastqname).unwrap();
-    let reader = BufReader::new(decoder);
-    let my_iter = reader.lines()
-        .skip(line)
-        .step_by(4)
-        // .enumerate().filter( move |(line_id, _)| line_id % 4 == line_tmp)
-        .filter_map(|line| line.ok()); //takes care of errors in file reading
-    my_iter
-}
-
-pub fn fastq_iter_new(fastqname: &str, line: usize) -> impl Iterator<Item=String> + '_  {
-    // iterates over the fastq file
-    // each fastq entry is four lines, we only pick out a specific one using the
-    // line arg:  
-    // line==0 -> header
-    // line==1 -> fastq seq
-    // line==2 -> sep
-    // line==3 -> phred    
-    assert!(line < 4);
-    // assert!(line >= 0);
-    let fastq_iter = FastIterator::new(fastqname);
-
-    assert_eq!(line, 1);
-    fastq_iter.map(|x: FastqEntry| x.seq)
-}
-
-
-pub fn fastq_list_iter(fastq_list: &[String], line: usize) -> impl Iterator<Item=String> + '_ {
-    // iterates over the concatenation of fastq files specified
-    // each fastq entry is four lines, we only pick out a specific one using the
-    // line arg:  
-    // line==0 -> header
-    // line==1 -> fastq seq
-    // line==2 -> sep
-    // line==3 -> phred
-    assert!(line < 4);
-    // assert!(line >= 0);
+// just chaining many fast files into a single iterator
+pub fn fastq_list_iter(fastq_list: &[String]) -> impl Iterator<Item=FastqEntry> + '_ {
+    
     let my_iter = fastq_list.iter()
-        .flat_map(move |fname| fastq_iter(fname, line));
-
-        // .map(move |fname| fastq_iter(fname, line))
-        // chaining, flatmapping all the iterators into a single one
-        // .flatten();     
-    my_iter     
+    .flat_map(move |fname| FastIterator::new(fname));
+    my_iter
 }
 
 #[test]
@@ -328,25 +251,25 @@ FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
     f.write_all(fastq_entry2.as_bytes()).expect("Unable to write data");
     f.flush().unwrap();
 
-    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()],0).collect();
+    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()]).map(|fq|fq.header).collect();
     assert_eq!(lines, vec!["@some read id", "@another read id"]);
 
-    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()],1).collect();
+    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()]).map(|fq|fq.seq).collect();
     assert_eq!(lines, vec!["AAAATTTTGGGGCCCCAAAATTTTGGGGCCCCAAAATTTTGGGGCCCC", "GGGGCCCCAAAATTTTGGGGCCCCAAAATTTTGGGGCCCCAAAATTTT"]);
 
-    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()],3).collect();
+    let lines: Vec<_> = fastq_list_iter(&vec![fastqname.to_string()]).map(|fq|fq.phred).collect();
     assert_eq!(lines, vec!["FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"])    ;
 }
 
 
 pub fn fastq_seq_iter(fastq_list: &[String]) -> impl Iterator<Item=CbUmi> + '_ {
     // iterates the sequences of the the fast files
-    fastq_list_iter(fastq_list, 1).filter_map(parse_r1_struct)
+    fastq_list_iter(fastq_list).filter_map(|fq|parse_r1_struct(fq.seq))
 }
 
 pub fn fastq_phred_iter (fastq_list: &[String]) -> impl Iterator<Item=String> + '_ {
     // instead if yielding the sequence, this one yields the PHRED ASCII scores of the reads
-    fastq_list_iter(fastq_list, 3)
+    fastq_list_iter(fastq_list).map(|fq|fq.phred)
 }
 
 pub fn parse_whitelist_gz(fname: &String) -> HashSet<String>{

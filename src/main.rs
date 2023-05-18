@@ -178,6 +178,6 @@ fn main() {
 
 pub fn count_fastq_reads(filename: String) -> usize{
     // count the nubmer of entries (not lines!) in the fastq
-    let count = rustfastq::io::fastq_list_iter(&[filename], 1).count();
+    let count = rustfastq::io::fastq_list_iter(&[filename]).count();
     count
 }
