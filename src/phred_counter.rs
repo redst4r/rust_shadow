@@ -1,16 +1,14 @@
 use counter::Counter;
-use crate::utils::{write_to_csv, };
 use polars::prelude::*;
 use crate::io::fastq_phred_iter;
 use indicatif::{ProgressBar, ProgressStyle, };
-
+use std::fs::File;
 
 #[cfg(test)]
 #[test]
 fn main(){
     use crate::test_files::TEST_FASTQ_R1;
-    run(&vec![TEST_FASTQ_R1.to_string()],"/tmp/phred.csv".to_string(),
-)
+    run(&vec![TEST_FASTQ_R1.to_string()],"/tmp/phred.csv".to_string())
 }
 
 
@@ -54,4 +52,12 @@ pub fn run(fastq_files: &[String], output_csv_file:String){
     
     write_to_csv(&mut df, output_csv_file);    
 
+}
+
+pub fn write_to_csv(df_final: &mut DataFrame, output_csv_file: String){
+    let mut output_file: File = File::create(output_csv_file).unwrap();
+    CsvWriter::new(&mut output_file)
+        .has_header(true)
+        .finish(df_final)
+        .unwrap();    
 }

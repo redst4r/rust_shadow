@@ -2,9 +2,8 @@
 use std::io::Write;
 use std::fs::File;
 use std::time::Instant;
-use rustbustools::busmerger;
 use clap::{self, Parser, Subcommand, Args};
-use rustfastq::{cb_errors, cb_umi_errors, cb_umi_sketch, cb_umi_per_cell, phred_counter, tso_error, cb_umi_per_cell_gene, io::test_filter};
+use rustfastq::{phred_counter, io::quality_filter};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -20,16 +19,19 @@ struct Cli {
 #[allow(non_camel_case_types)]
 #[derive(Subcommand)]
 enum MyCommand {
-    cb(FastqArgs),
-    cb_umi_exact(FastqArgs),
-    cb_umi_sketch(FastqArgs),
-    cb_umi_cell(BusArgs),
-    cb_umi_cell_gene(BusArgs2),
-    busmerge(BusMergeArgs),
-    tso_error(TSOArgs),
     phred(PhredArgs),
     count(CountArgs),
-    filter,
+    qcfilter(QCFilterArgs),
+}
+
+#[derive(Args)]
+struct QCFilterArgs{
+    /// List of fastq files
+    #[clap()]
+    fastq_file: String,
+    /// QC score threhold: any read with less will be dropped
+    #[clap(short = 'q', long= "qcscore")] 
+    qcscore: f32, 
 }
 
 #[derive(Args)]
@@ -61,99 +63,14 @@ struct FastqArgs{
     fastq_list: Vec<String>,
 }
 
-#[derive(Args)]
-struct BusArgs{
-    /// Busfile to read the CB/UMIs from
-    #[clap(long= "busfile")] 
-    busfile: String,
-    
-    /// Max #entries to consider in the bus file
-    #[clap(short = 'n', long= "nmax")] 
-    nmax: usize,
-
-    /// whether to aggregate the entries on a cell level (one row per cell), or ouput one row per UMI
-    #[clap(long= "aggr")] 
-    aggregate: bool,
-}
-
-
-#[derive(Args)]
-struct BusArgs2{
-    /// Busfolder to read the CB/UMIs from
-    /// contains the busfile and ec.matrix, transcripts
-    #[clap(long= "busfolder")] 
-    busfolder: String,
-
-    /// transcript to gene filename
-    #[clap(long= "t2g")] 
-    t2gfile: String,
-    
-    /// whether to aggregate the entries on a cell level (one row per cell), or ouput one row per UMI
-    #[clap(long= "aggr")] 
-    aggregate: bool,
-
-    /// Max #entries to consider in the bus file
-    #[clap(short = 'n', long= "nmax")] 
-    nmax: usize
-}
-
-#[derive(Args)]
-struct TSOArgs{
-    /// List of fastq files
-    #[clap()]
-    fastq_list: Vec<String>,
-}
-
-#[derive(Args)]
-struct BusMergeArgs{
-    #[clap(long= "i1")] 
-    inbus1: String,
-    #[clap(long= "i2")] 
-    inbus2: String,
-
-    #[clap(long= "o1")] 
-    outbus1: String,
-    #[clap(long= "o2")] 
-    outbus2: String,  
-}
-
 fn main() {   
     let cli = Cli::parse();
 
     match cli.command{
-        MyCommand::cb(args) => {
-            println!("Doing CB only");
-            cb_errors::run(&args.fastq_list, args.whitelist, cli.output, args.topn)           
-        },
-        MyCommand::cb_umi_exact(args) => {
-            println!("Doing CB_UMI sketch");
-            println!("WARNING: MEMORY INTENSIVE!!");
-            cb_umi_errors::run(&args.fastq_list, args.whitelist, cli.output, args.topn)
-        },
-        MyCommand::cb_umi_sketch(args) => {
-            println!("Doing CB_UMI sketch");
-            cb_umi_sketch::run_top_n(&args.fastq_list, args.whitelist, cli.output, args.topn)
-        },
-        MyCommand::cb_umi_cell(args) => {
-            println!("Doing CB_UMI via single cells");
-            cb_umi_per_cell::run(&args.busfile, &cli.output, args.nmax, args.aggregate)  
-        }
-        MyCommand::busmerge(args) => {
-            println!("Doing bus merging");
-            busmerger::merge_busfiles_on_overlap(&args.inbus1, &args.inbus2, &args.outbus1, &args.outbus2)      
-        }
-        MyCommand::tso_error(args) => {
-            println!("Doing TSO error");
-            tso_error::run(&args.fastq_list, cli.output)     
-        } 
         MyCommand::phred(args) => {
             println!("Doing Phred Counter");
             phred_counter::run(&args.fastq_list, cli.output)      
         }                   
-        MyCommand::cb_umi_cell_gene(args) => {
-            println!("Doing CUG error");
-            cb_umi_per_cell_gene::run(args.busfolder, &cli.output, args.nmax, args.aggregate, args.t2gfile)      
-        }    
         MyCommand::count(args) => {
             println!("Doing counting");
             let mut file_handle = File::create(cli.output).unwrap();
@@ -170,8 +87,8 @@ fn main() {
                 file_handle.write_all(format!("{}\t{}\n", filename, c).as_bytes()).unwrap();
             }
         }
-        MyCommand::filter => {
-            test_filter();
+        MyCommand::qcfilter(args) => {
+            quality_filter(&args.fastq_file, &cli.output, args.qcscore)
         },
     };
 }
@@ -180,4 +97,43 @@ pub fn count_fastq_reads(filename: String) -> usize{
     // count the nubmer of entries (not lines!) in the fastq
     let count = rustfastq::io::fastq_list_iter(&[filename]).count();
     count
+}
+
+use std::collections::HashMap;
+use itertools::izip;
+
+pub fn paired_index_counter(i1file: String, i2file: String) {
+
+    let i1_list = [i1file];
+    let i2_list = [i2file];
+    
+    let i1 = rustfastq::io::fastq_list_iter(&i1_list);
+    let i2 = rustfastq::io::fastq_list_iter(&i2_list);
+
+    let mut counter: HashMap<(String, String), usize> = HashMap::new();
+
+    for (f1, f2) in izip!(i1, i2) { //.take(1_000_000)
+        let c = counter.entry((f1.seq, f2.seq)).or_insert(0);
+        *c += 1;
+    }
+
+    // Get a sorted (by field 0 ("count") in reversed order) list of the
+    // most frequently used indices:
+    let mut count_vec: Vec<((String, String), usize)> = counter.into_iter().collect();
+
+    count_vec.sort_by(|a,b| b.1.cmp(&a.1));
+
+    for ((s1, s2), c) in  count_vec.iter().take(20) {
+        // if c > 10000 {
+            println!("{}_{}:{}", s1,s2,c)
+        // }
+    }
+}
+
+#[test]
+fn test_paired() {
+    paired_index_counter(
+        "/home/michi/mounts/myDrive/230601_VH00715_118_AACVG5JM5_fastq/Undetermined_S0_L001_I1_001.fastq.gz".to_string(), 
+        "/home/michi/mounts/myDrive/230601_VH00715_118_AACVG5JM5_fastq/Undetermined_S0_L001_I2_001.fastq.gz".to_string(), 
+    );
 }
