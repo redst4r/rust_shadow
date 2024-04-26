@@ -8,13 +8,16 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
 
-pub struct FastqEntry{
-    header: String,
-    seq: String,
-    phred: String
+/// A single FastQ entry, with header, sequence and quality scores
+pub struct FastqEntry {
+    pub header: String,
+    pub seq: String,
+    pub phred: String,
 }
 
 impl FastqEntry {
+    /// Turns the FastQ entry intro a String representation that can directly be written
+    /// to a fastq file 
     pub fn to_string(&self) -> String {
         // format is much slower!!
         // format!("{}\n{}\n+\n{}\n", self.header, self.seq, self.phred)
@@ -28,6 +31,7 @@ impl FastqEntry {
         s
     }
 }
+/// Iterator over a fastq.gz file, yielding [`FastEntry`]
 struct FastIterator {
     reader: BufReader<bgzf::Reader>,
 }
@@ -70,6 +74,8 @@ impl Iterator for FastIterator {
     }
 }
 
+/// Caches the Phred symbol to probability translation table
+/// TODO: could be done using lazy_static
 struct PhredCache {
     cache: Vec<f32>,
 }
@@ -107,6 +113,11 @@ fn phred_symbol_to_prob(phred: char) -> f32 {
 //     "phred score to ascii"
 //     return str(chr(phred+33))
 
+/// Filters a fastq-file for all reads having an aggregated PhredScore of > `threshold_qc`
+/// # Parameters:
+/// * fastqname: File to be filtered
+/// * outname: File where to write the filtered records
+/// * threshold_qc: minimum  (aggreated) Phred Score a read needs to pass to get written
 pub fn quality_filter(fastqname: &str, outname: &str, threshold_qc: f32) {
     // reading the fastq
     let fastq_iter = FastIterator::new(fastqname);
@@ -169,7 +180,7 @@ pub fn read_filter_whitelist(fastqname: &str, outname: &str, whitelist: &str) {
     )
 }
 
-// just chaining many fast files into a single iterator
+/// Chaining many fastq files into a single iterator
 pub fn fastq_list_iter(fastq_list: &[String]) -> impl Iterator<Item = FastqEntry> + '_ {
     let my_iter = fastq_list
         .iter()
@@ -177,13 +188,15 @@ pub fn fastq_list_iter(fastq_list: &[String]) -> impl Iterator<Item = FastqEntry
     my_iter
 }
 
+/// Chaining many fastq files into a single iterator
 pub fn fastq_phred_iter(fastq_list: &[String]) -> impl Iterator<Item = String> + '_ {
     // instead if yielding the sequence, this one yields the PHRED ASCII scores of the reads
     fastq_list_iter(fastq_list).map(|fq| fq.phred)
 }
 
+/// Loading 10x CB whilelist from file
+/// Returns a HashSet of CBs
 pub fn parse_whitelist_gz(fname: &String) -> HashSet<String> {
-    // loading 10x CB whilelist from file
     let decoder = bgzf::Reader::from_path(fname).unwrap();
     let reader = BufReader::new(decoder);
     let my_iter = reader.lines(); //.take(10_000_000);

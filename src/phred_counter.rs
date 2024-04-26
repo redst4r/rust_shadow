@@ -57,7 +57,7 @@ pub fn run(fastq_files: &[String], output_csv_file:String){
 pub fn write_to_csv(df_final: &mut DataFrame, output_csv_file: String){
     let mut output_file: File = File::create(output_csv_file).unwrap();
     CsvWriter::new(&mut output_file)
-        .has_header(true)
+        .include_header(true)
         .finish(df_final)
         .unwrap();    
 }
