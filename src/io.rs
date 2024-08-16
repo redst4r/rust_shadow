@@ -8,6 +8,26 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Write;
 
+fn switch_base(base: char) -> char{
+    match base {
+        'A' => 'T',
+        'T' => 'A',
+        'C' => 'G',
+        'G' => 'C',
+        'N' => 'N',
+        _ => panic!("unknown base")
+    }
+}
+
+pub fn reverse_complement(seq: &str) -> String {
+    let mut rc = String::with_capacity(seq.len());
+
+    for c in seq.chars().rev() {
+        rc.push(switch_base(c))
+    }
+    rc
+}
+
 /// A single FastQ entry, with header, sequence and quality scores
 pub struct FastqEntry {
     pub header: String,
@@ -32,7 +52,7 @@ impl FastqEntry {
     }
 }
 /// Iterator over a fastq.gz file, yielding [`FastEntry`]
-struct FastIterator {
+pub struct FastIterator {
     reader: BufReader<bgzf::Reader>,
 }
 
@@ -74,9 +94,18 @@ impl Iterator for FastIterator {
     }
 }
 
+
+use once_cell::sync::Lazy;
+pub static PHRED_LOOKUP: Lazy<PhredCache> = Lazy::new(|| {
+    let lookup = PhredCache::new();
+    lookup
+});
+
+
+
 /// Caches the Phred symbol to probability translation table
 /// TODO: could be done using lazy_static
-struct PhredCache {
+pub struct PhredCache {
     cache: Vec<f32>,
 }
 impl PhredCache {
@@ -210,6 +239,8 @@ pub fn parse_whitelist_gz(fname: &String) -> HashSet<String> {
 
 #[cfg(test)]
 mod testing {
+    use crate::io::reverse_complement;
+
     // #[test]
     use super::{fastq_list_iter, quality_filter, FastqEntry, PhredCache};
     use rust_htslib::bgzf;
@@ -314,4 +345,17 @@ mod testing {
             ]
         );
     }
+    #[test]
+    fn test_rc(){
+        assert_eq!(
+            reverse_complement("AAGG"), "CCTT"
+        );
+        assert_eq!(
+            reverse_complement("AAAA"), "TTTT"
+        );
+        assert_eq!(
+            reverse_complement("ATGC"), "GCAT"
+        );
+    }
+    
 }

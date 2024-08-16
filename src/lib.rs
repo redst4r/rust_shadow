@@ -1,3 +1,5 @@
 pub mod io;
 pub mod phred_counter;
-mod test_files;
+pub mod test_files;
+pub mod demultiplex;
+pub mod utils;

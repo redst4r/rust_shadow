@@ -1,8 +1,8 @@
 use counter::Counter;
-use polars::prelude::*;
+use itertools::izip;
 use crate::io::fastq_phred_iter;
 use indicatif::{ProgressBar, ProgressStyle, };
-use std::fs::File;
+
 
 #[cfg(test)]
 #[test]
@@ -48,16 +48,27 @@ pub fn run(fastq_files: &[String], output_csv_file:String){
     // let series_pos = Series::new("position", positions);
 
 
-    let mut df = df!("phred" => phred_scores, "frequency" => freqs, "position" => positions).unwrap();
-    
-    write_to_csv(&mut df, output_csv_file);    
+    // let mut df = df!("phred" => phred_scores, "frequency" => freqs, "position" => positions).unwrap();
+    // write_to_csv_polars(&mut df, output_csv_file);    
 
+    write_to_csv_simple(phred_scores,positions, freqs, output_csv_file).unwrap();
 }
 
-pub fn write_to_csv(df_final: &mut DataFrame, output_csv_file: String){
-    let mut output_file: File = File::create(output_csv_file).unwrap();
-    CsvWriter::new(&mut output_file)
-        .include_header(true)
-        .finish(df_final)
-        .unwrap();    
+pub fn write_to_csv_simple(phred_scores: Vec<String>, positions: Vec<u64>, freqs: Vec<u64>, output_csv_file: String) -> Result<(), csv::Error>{
+    let mut wtr = csv::Writer::from_path(output_csv_file)?;
+
+    wtr.write_record(["phred","frequency","position"])?;
+    for (ph, pos, freq) in izip!(phred_scores, positions, freqs) {
+        wtr.write_record(&[ph, pos.to_string(), freq.to_string()])?;
+    }
+    wtr.flush()?;
+    Ok(())
+
 }
+// pub fn write_to_csv_polars(df_final: &mut DataFrame, output_csv_file: String){
+//     let mut output_file: File = File::create(output_csv_file).unwrap();
+//     CsvWriter::new(&mut output_file)
+//         .include_header(true)
+//         .finish(df_final)
+//         .unwrap();    
+// }
