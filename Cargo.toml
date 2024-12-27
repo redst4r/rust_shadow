@@ -1,6 +1,6 @@
 [package]
 name = "rustfastq"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 
 license = " GPL-3.0-or-later"
@@ -14,15 +14,17 @@ categories = ["science"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rust-htslib ="0.47.0"
+# getting rid of the curl feature, which pulls in openssl, not compiling on tuba
+rust-htslib = {version= "0.47.0", default-features = false, features=["bzip2", "lzma"]}
 counter = "0.6.0"
-# polars = {version = "0.37.0"} # features =["parquet", "lazy"]
 indicatif = "0.17"
 clap = { version = "4", features = ["derive"] }
 itertools="0.13.0"
 regex = "1.11"
 csv="1"
 once_cell = "1.19.0"  # for Phred Cahce
+
+# polars = {version = "0.37.0"} # features =["parquet", "lazy"]
 
 
 [dev-dependencies]
