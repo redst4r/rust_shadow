@@ -1,6 +1,4 @@
 use core::panic;
-use rust_htslib::bgzf;
-use rust_htslib::bgzf::CompressionLevel;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufRead;
@@ -29,6 +27,7 @@ pub fn reverse_complement(seq: &str) -> String {
 }
 
 /// A single FastQ entry, with header, sequence and quality scores
+#[derive(Debug)]
 pub struct FastqEntry {
     pub header: String,
     pub seq: String,
@@ -51,48 +50,159 @@ impl FastqEntry {
         s
     }
 }
+
+// ==========================================================
+// ==========================================================
+// ==========================================================
+// use rust_htslib::bgzf;
+// use rust_htslib::bgzf::CompressionLevel;
+
 /// Iterator over a fastq.gz file, yielding [`FastEntry`]
+// pub struct FastIterator {
+//     reader: BufReader<bgzf::Reader>,
+// }
+
+// impl FastIterator {
+//     pub fn new(fastqname: &str) -> Self {
+//         let decoder = bgzf::Reader::from_path(fastqname).unwrap();
+//         let reader = BufReader::with_capacity(800 * 1024, decoder);
+//         FastIterator { reader }
+//     }
+// }
+
+// impl Iterator for FastIterator {
+//     type Item = FastqEntry;
+
+//     fn next(&mut self) -> Option<Self::Item> {
+//         let mut header = String::new();
+//         // try to read a header
+//         match self.reader.read_line(&mut header) {
+//             Ok(0) => None,
+//             Ok(_n) => {
+//                 let mut seq = String::new();
+//                 self.reader.read_line(&mut seq).unwrap();
+
+//                 let mut dummy = String::new();
+//                 self.reader.read_line(&mut dummy).unwrap();
+
+//                 let mut phred = String::new();
+//                 self.reader.read_line(&mut phred).unwrap();
+
+//                 let fq = FastqEntry {
+//                     header: header.trim().to_string(),
+//                     seq: seq.trim().to_string(),
+//                     phred: phred.trim().to_string(),
+//                 };
+//                 Some(fq)
+//             }
+//             Err(e) => panic!("{}", e),
+//         }
+//     }
+// }
+
+
+// ==========================================================
+// ==========================================================
+// ==========================================================
+
+use core::str;
+use noodles::bgzf as noodles_bgzf;
+use noodles::fastq as fastq;
+
+
 pub struct FastIterator {
-    reader: BufReader<bgzf::Reader>,
+    reader: fastq::Reader<noodles_bgzf::Reader<File>>,
+    buffer: fastq::Record,
 }
 
 impl FastIterator {
     pub fn new(fastqname: &str) -> Self {
-        let decoder = bgzf::Reader::from_path(fastqname).unwrap();
-        let reader = BufReader::with_capacity(800 * 1024, decoder);
-        FastIterator { reader }
-    }
-}
+        let decoder = noodles_bgzf::reader::Builder.build_from_path(fastqname).unwrap();
+        let reader = fastq::io::Reader::new(decoder);
 
-impl Iterator for FastIterator {
-    type Item = FastqEntry;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut header = String::new();
-        // try to read a header
-        match self.reader.read_line(&mut header) {
-            Ok(0) => None,
-            Ok(_n) => {
-                let mut seq = String::new();
-                self.reader.read_line(&mut seq).unwrap();
-
-                let mut dummy = String::new();
-                self.reader.read_line(&mut dummy).unwrap();
-
-                let mut phred = String::new();
-                self.reader.read_line(&mut phred).unwrap();
-
-                let fq = FastqEntry {
-                    header: header.trim().to_string(),
-                    seq: seq.trim().to_string(),
-                    phred: phred.trim().to_string(),
-                };
-                Some(fq)
-            }
-            Err(e) => panic!("{}", e),
+        FastIterator { 
+            reader , 
+            // just a dummy
+            buffer: fastq::Record::new(fastq::record::Definition::new("r0", ""), "AGCT", "NDLS")
         }
     }
 }
+
+/// transform noodle's output to our FastqEntry
+fn noodles_record_to_fastq_entry(record: &fastq::Record) -> FastqEntry {
+
+    let seq_bytes = record.sequence();
+    let phred_bytes = record.quality_scores();
+    let phred_string = str::from_utf8(phred_bytes).unwrap();
+    let seq_string = str::from_utf8(seq_bytes).unwrap();
+    let mut name_string =  record.name().to_string();
+    let desc = record.description().to_string();
+    name_string.push(' ');
+    name_string.push_str(&desc);
+
+    FastqEntry {
+        seq: seq_string.to_owned(),
+        phred: phred_string.to_owned(),
+        header: name_string
+    }
+}
+
+#[test]
+fn test_noodle(){
+    use crate::test_files::TEST_FASTQ_R1;
+    let mut f = FastIterator::new(TEST_FASTQ_R1)   ;
+    for fq_entry in f.reader.records().take(5).flatten() {
+
+        let fff = noodles_record_to_fastq_entry(&fq_entry);
+        println!("{}", fff.to_string());
+    }
+}
+
+#[test]
+fn test_noodle2(){
+    use crate::test_files::TEST_FASTQ_R1;
+    let f = FastIterator::new(TEST_FASTQ_R1);
+    for r in f.take(10) {
+        println!("{}", r.to_string());
+    }
+}
+
+#[test]
+fn test_noodle3(){
+    use crate::test_files::TEST_FASTQ_R1;
+    let mut f = FastIterator::new("/tmp/foo.fastq.gz");
+    // let mut f = FastIterator::new(TEST_FASTQ_R1);
+
+    let x = f.next();
+    println!("GGGGGGGGGGGGGG {:?}", x);
+
+    let s = f.next();
+    println!("sssssssssssss {:?}", s);
+
+    for r in f.take(10) {
+        println!("F: {}", r.to_string());
+    }
+    println!("F:");
+
+}
+
+
+impl Iterator for FastIterator {
+    type Item = FastqEntry;
+    fn next(&mut self) -> Option<Self::Item> {
+
+        let nread = self.reader.read_record(&mut self.buffer).unwrap();
+        if nread == 0 {
+            None
+        } else {
+            Some(noodles_record_to_fastq_entry(&self.buffer))
+        }
+    }
+}
+
+// ==========================================================
+// ==========================================================
+// ==========================================================
 
 
 use once_cell::sync::Lazy;
@@ -100,8 +210,6 @@ pub static PHRED_LOOKUP: Lazy<PhredCache> = Lazy::new(|| {
     let lookup = PhredCache::new();
     lookup
 });
-
-
 
 /// Caches the Phred symbol to probability translation table
 /// TODO: could be done using lazy_static
@@ -132,6 +240,11 @@ fn phred_symbol_to_prob(phred: char) -> f32 {
     10_f32.powf(-(q as f32) / 10_f32)
 }
 
+fn get_bgzf_writer(outname: &str) -> noodles_bgzf::Writer<BufWriter<File>> {
+    let inner = BufWriter::new(File::create(outname).unwrap());
+    noodles_bgzf::Writer::new(inner)
+}
+
 // fn avg_phred(phred: &str) -> f32{
 //     let n_chars = phred.len() as f32;
 //     let summed_probs: f32 = phred.chars().map(|c| phred_symbol_to_prob(c)).sum();
@@ -154,8 +267,10 @@ pub fn quality_filter(fastqname: &str, outname: &str, threshold_qc: f32) {
 
     let cache = PhredCache::new();
 
-    let encoder = bgzf::Writer::from_path_with_level(outname, CompressionLevel::Fastest).unwrap();
-    let mut writer = BufWriter::new(encoder);
+    let mut writer = get_bgzf_writer(outname);
+
+    // let encoder = bgzf::Writer::from_path_with_level(outname, CompressionLevel::Fastest).unwrap();
+    // let mut writer = BufWriter::new(encoder);
 
     let mut total_reads = 0;
     let mut passing_reads = 0;
@@ -188,8 +303,11 @@ pub fn read_filter_whitelist(fastqname: &str, outname: &str, whitelist: &str) {
     let fastq_iter = FastIterator::new(fastqname);
 
     //writing the filtered
-    let encoder = bgzf::Writer::from_path_with_level(outname, CompressionLevel::Fastest).unwrap();
-    let mut writer = BufWriter::new(encoder);
+    // let encoder = bgzf::Writer::from_path_with_level(outname, CompressionLevel::Fastest).unwrap();
+    // let mut writer = BufWriter::new(encoder);
+
+    let mut writer = get_bgzf_writer(outname);
+
 
     let mut total_reads = 0;
     let mut passing_reads = 0;
@@ -227,8 +345,10 @@ pub fn fastq_phred_iter(fastq_list: &[String]) -> impl Iterator<Item = String> +
 /// Loading 10x CB whilelist from file
 /// Returns a HashSet of CBs
 pub fn parse_whitelist_gz(fname: &String) -> HashSet<String> {
-    let decoder = bgzf::Reader::from_path(fname).unwrap();
-    let reader = BufReader::new(decoder);
+    // let decoder = bgzf::Reader::from_path(fname).unwrap();
+    // let reader = BufReader::new(decoder);
+    
+    let reader = noodles_bgzf::Reader::new(File::open(fname).unwrap());
     let my_iter = reader.lines(); //.take(10_000_000);
     let mut hset: HashSet<String> = HashSet::new();
     for line in my_iter.flatten() {
@@ -269,7 +389,7 @@ mod testing {
         }
     }
     #[test]
-    fn test_PhredCache() {
+    fn test_phred_cache() {
         let cache = PhredCache::new();
         assert_eq!(0.0001, cache.get_prob('I')); //Q40
         assert_eq!(0.001, cache.get_prob('?')); //Q30
@@ -291,18 +411,19 @@ mod testing {
         let elapsed_time = now.elapsed();
         println!("Running took {} sec.", elapsed_time.as_secs());
     }
+
     #[test]
     fn test_fastq() {
-        let fastq_entry1 = "@some read id
-    AAAATTTTGGGGCCCCAAAATTTTGGGGCCCCAAAATTTTGGGGCCCC
-    +
-    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-    ";
-        let fastq_entry2 = "@another read id
-    GGGGCCCCAAAATTTTGGGGCCCCAAAATTTTGGGGCCCCAAAATTTT
-    +
-    FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-    ";
+        let fastq_entry1 = "@some_read_id
+AAAATTTTGGGGCCCCAAAATTTTGGGGCCCCAAAATTTTGGGGCCCC
++
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+";
+        let fastq_entry2 = "@another_read_id
+GGGGCCCCAAAATTTTGGGGCCCCAAAATTTTGGGGCCCCAAAATTTT
++
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+";
         // TODO there's an issue with trailing lines!!
 
         use std::fs::File;

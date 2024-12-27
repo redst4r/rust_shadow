@@ -6,13 +6,13 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
 use clap::{self, Parser, Subcommand, Args};
-use rustfastq::demultiplex;
-use rustfastq::demultiplex::demux_dual_index;
-use rustfastq::demultiplex::samplesheet_to_hashmap;
-use rustfastq::demultiplex::samplesheet_to_hashmap_2;
-use rustfastq::demultiplex::DualIndex;
-use rustfastq::demultiplex::Samplename;
-use rustfastq::demultiplex::Samplesheet;
+// use rustfastq::demultiplex;
+// use rustfastq::demultiplex::demux_dual_index;
+// use rustfastq::demultiplex::samplesheet_to_hashmap;
+// use rustfastq::demultiplex::samplesheet_to_hashmap_2;
+// use rustfastq::demultiplex::DualIndex;
+// use rustfastq::demultiplex::Samplename;
+// use rustfastq::demultiplex::Samplesheet;
 use rustfastq::utils::get_spinner;
 use rustfastq::{phred_counter, io::quality_filter};
 
@@ -156,24 +156,22 @@ fn main() {
          */
         MyCommand::demux_dual(args) => {
 
-            let outdir = Path::new(&cli.output);
-            assert!(outdir.exists() && outdir.is_dir());
+            // let outdir = Path::new(&cli.output);
+            // assert!(outdir.exists() && outdir.is_dir());
 
-            // let sheet: HashMap<_,_> = vec![
-            //     (DualIndex("GGGGGGGGGG".to_string(), "AGATCTCGGT".to_string()), Samplename("AGATCTCGGT".to_string())),
-            //     (DualIndex("GGGGGGGGGG".to_string(), "ATAGATGCTC".to_string()), Samplename("ATAGATGCTC".to_string())),
-            //     (DualIndex("GGGGGGGGGG".to_string(), "GTAACAGGAA".to_string()), Samplename("GTAACAGGAA".to_string())),
-            // ].into_iter().collect();
-            // let samplesheet = crate::demultiplex::Samplesheet::new(sheet);
+            // // let sheet: HashMap<_,_> = vec![
+            // //     (DualIndex("GGGGGGGGGG".to_string(), "AGATCTCGGT".to_string()), Samplename("AGATCTCGGT".to_string())),
+            // //     (DualIndex("GGGGGGGGGG".to_string(), "ATAGATGCTC".to_string()), Samplename("ATAGATGCTC".to_string())),
+            // //     (DualIndex("GGGGGGGGGG".to_string(), "GTAACAGGAA".to_string()), Samplename("GTAACAGGAA".to_string())),
+            // // ].into_iter().collect();
+            // // let samplesheet = crate::demultiplex::Samplesheet::new(sheet);
 
-            // let samplesheet = samplesheet_to_hashmap_2();
-            let samplesheet = Samplesheet::from_csv(&args.samplesheet);
+            // // let samplesheet = samplesheet_to_hashmap_2();
+            // let samplesheet = Samplesheet::from_csv(&args.samplesheet);
 
-            let unassigned = "UA".to_string();
-            demultiplex::demux_dual_index_2(samplesheet,unassigned, 
-                args.i1_list, args.i2_list, args.r1_list, args.r2_list, outdir);
-
-
+            // let unassigned = "UA".to_string();
+            // demultiplex::demux_dual_index_2(samplesheet,unassigned, 
+            //     args.i1_list, args.i2_list, args.r1_list, args.r2_list, outdir);
         },
     };
 }
