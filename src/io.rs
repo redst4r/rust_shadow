@@ -120,7 +120,8 @@ impl PhredCache {
     }
     pub fn get_prob(&self, c: char) -> f32 {
         let i = (c as u32) - 33;
-        self.cache[i as usize]
+        // self.cache[i as usize]
+        *self.cache.get(i as usize).expect(&format!("{c} unknown"))
     }
 }
 
